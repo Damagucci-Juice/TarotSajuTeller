@@ -57,6 +57,11 @@ class BaseViewController: UIViewController, BasicViewProtocol {
 
 final class MainViewController: BaseViewController {
 
+    private let resultLabel = UILabel().then { lbl in
+        lbl.textColor = .black
+        lbl.numberOfLines = 0
+    }
+
     private let callButton = UIButton().then { btn in
         btn.setTitle("요청하기", for: .normal)
     }
@@ -68,11 +73,17 @@ final class MainViewController: BaseViewController {
 
     override func setupHierarchy() {
         super.setupHierarchy()
+        view.addSubview(resultLabel)
         view.addSubview(callButton)
     }
 
     override func setupLayout() {
         super.setupLayout()
+        resultLabel.snp.makeConstraints { make in
+            make.top.horizontalEdges.equalToSuperview().inset(16)
+            make.bottom.equalTo(callButton.snp.top).inset(16)
+        }
+
         callButton.snp.makeConstraints { make in
             make.center.equalToSuperview()
         }
@@ -95,10 +106,10 @@ final class MainViewController: BaseViewController {
         let solarRequestDto = SolarRequestDTO(solarDay: 3, solarMonth: 8, solarYear: 1995)
         NetworkService.shared.fetch(
             .solarToLuna(requestDto: solarRequestDto),
-            type: String.self) { result in
+            type: SolarToLunaResponse.self) { result in
                 switch result {
                 case .success(let answer):
-                    self.view.makeToast(answer)
+                    self.resultLabel.text = answer.response.body.items.item.description
                 case .failure(let error):
                     self.view.makeToast(error.localizedDescription)
                 }
@@ -130,24 +141,62 @@ struct SolarRequestDTO {
     let solarYear: Int
 }
 
-struct LunaResponseDTO: Decodable {
-    let header: String
-    let body: LunaItemsDTO
+struct SolarToLunaResponse: Decodable {
+    let response: ResponseData
 }
 
-struct LunaItemsDTO: Decodable {
-    let items: LunaInfoDTO
+struct ResponseData: Decodable {
+    let header: ResponseHeader
+    let body: ResponseBody
 }
 
-struct LunaInfoDTO: Decodable {
-    let lunDay, lunIljin, lunLeapmonth, lunMonth: String
-    let lunNday: Int
-    let lunSecha, lunWolgeon: String
+struct ResponseHeader: Decodable {
+    let resultCode: String
+    let resultMsg: String
+}
+
+struct ResponseBody: Decodable {
+    let items: ItemContainer
+    let numOfRows: Int
+    let pageNo: Int
+    let totalCount: Int
+}
+
+struct ItemContainer: Decodable {
+    let item: LunaItem
+}
+
+struct LunaItem: Decodable, CustomStringConvertible {
     let lunYear: Int
-    let solDay: String
-    let solJd: Int
-    let solLeapyear, solMonth, solWeek: String
+    let lunMonth: String
+    let lunDay: String
+    let lunIljin: String      // "병인(丙寅)" -> 한자가 포함된 문자열
+    let lunSecha: String      // "을해(乙亥)"
+    let lunWolgeon: String    // "갑신(甲申)"
+    let lunLeapmonth: String
+    let lunNday: Int
     let solYear: Int
+    let solMonth: String
+    let solDay: String
+    let solWeek: String
+    let solLeapyear: String
+    let solJd: Int
+
+    var description: String {
+            return """
+            --- 🗓️ 변환 결과 ---
+            [양력] \(solYear)년 \(solMonth)월 \(solDay)일 (\(solWeek)요일)
+            [음력] \(lunYear)년 \(lunMonth)월 \(lunDay)일 (\(lunLeapmonth == "평" ? "평달" : "윤달"))
+
+            --- 🔮 사주 원국 (삼주) ---
+            년주(年柱): \(lunSecha)
+            월주(月柱): \(lunWolgeon)
+            일주(日柱): \(lunIljin)
+
+            * 시주(時柱)는 태어난 시간을 입력하면 계산이 가능합니다.
+            -------------------
+            """
+        }
 }
 
 enum TaroRouter: URLRequestConvertible {
@@ -182,7 +231,6 @@ enum TaroRouter: URLRequestConvertible {
     }
 
     func asURLRequest() throws -> URLRequest {
-        print("URL", baseURL)
         let url = try baseURL.asURL()
         var urlRequest = URLRequest(url: url.appendingPathComponent(path))
         urlRequest.httpMethod = method.rawValue
@@ -199,18 +247,16 @@ final class NetworkService {
     static let shared = NetworkService()
     private init() { }
 
-    func fetch<T>(_ api: TaroRouter, type: T.Type, completion: @escaping (Result<String, SolarError>) -> Void) {
+    func fetch<T>(_ api: TaroRouter,
+                  type: T.Type,
+                  completion: @escaping (Result<T, SolarError>) -> Void) where T: Decodable {
         do {
-            let urlRequest = try api.asURLRequest()
-
-
-            AF.request(urlRequest)
+            AF.request(try api.asURLRequest())
                 .validate()
-                .responseString { response in
-                    print(response)
+                .responseDecodable(of: type.self) { response in
                     switch response.result {
-                    case .success(let answer):
-                        completion(.success(answer))
+                    case .success(let responseDto):
+                        completion(.success(responseDto))
                     case .failure:
                         completion(.failure(.unknown))
                     }
