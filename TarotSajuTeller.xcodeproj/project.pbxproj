@@ -89,10 +89,12 @@
 				BE1BA7E62F41B235000FE4C0 /* Sources */,
 				BE1BA7E72F41B235000FE4C0 /* Frameworks */,
 				BE1BA7E82F41B235000FE4C0 /* Resources */,
+				BE1BA81D2F41B56C000FE4C0 /* ShellScript */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				BE1BA81C2F41B4B7000FE4C0 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				BE1BA7EC2F41B235000FE4C0 /* TarotSajuTeller */,
@@ -144,6 +146,7 @@
 				BE1BA80B2F41B2DF000FE4C0 /* XCRemoteSwiftPackageReference "Then" */,
 				BE1BA80E2F41B2FC000FE4C0 /* XCRemoteSwiftPackageReference "Toast-Swift" */,
 				BE1BA8112F41B318000FE4C0 /* XCRemoteSwiftPackageReference "RxSwift" */,
+				BE1BA81A2F41B480000FE4C0 /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BE1BA7EB2F41B235000FE4C0 /* Products */;
@@ -165,6 +168,26 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		BE1BA81D2F41B56C000FE4C0 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "SWIFT_PACKAGE_DIR=\"${BUILD_DIR%Build/*}SourcePackages/artifacts\"\nSWIFTLINT_CMD=\"$SWIFT_PACKAGE_DIR/swiftlintplugins/SwiftLintBinary/SwiftLintBinary.artifactbundle/macos/swiftlint\"\n\nif test -f \"$SWIFTLINT_CMD\" 2>&1\nthen\n    \"$SWIFTLINT_CMD\"\nelse\n    echo \"warning: `swiftlint` command not found - See https://github.com/realm/SwiftLint#xcode-run-script-build-phase for installation instructions.\"\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		BE1BA7E62F41B235000FE4C0 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -175,6 +198,13 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		BE1BA81C2F41B4B7000FE4C0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = BE1BA81B2F41B4B7000FE4C0 /* SwiftLintBuildToolPlugin */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
 		BE1BA7FE2F41B237000FE4C0 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -184,6 +214,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = D7F6ZDDCV9;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TarotSajuTeller/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -221,6 +252,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = D7F6ZDDCV9;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TarotSajuTeller/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -443,6 +475,14 @@
 				minimumVersion = 6.10.1;
 			};
 		};
+		BE1BA81A2F41B480000FE4C0 /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SimplyDanny/SwiftLintPlugins";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.63.2;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -490,6 +530,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BE1BA8112F41B318000FE4C0 /* XCRemoteSwiftPackageReference "RxSwift" */;
 			productName = RxSwift;
+		};
+		BE1BA81B2F41B4B7000FE4C0 /* SwiftLintBuildToolPlugin */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BE1BA81A2F41B480000FE4C0 /* XCRemoteSwiftPackageReference "SwiftLintPlugins" */;
+			productName = "plugin:SwiftLintBuildToolPlugin";
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
