@@ -6,6 +6,18 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		BE1BA8042F41B2B7000FE4C0 /* Alamofire in Frameworks */ = {isa = PBXBuildFile; productRef = BE1BA8032F41B2B7000FE4C0 /* Alamofire */; };
+		BE1BA8072F41B2C4000FE4C0 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = BE1BA8062F41B2C4000FE4C0 /* Kingfisher */; };
+		BE1BA80A2F41B2D3000FE4C0 /* SnapKit in Frameworks */ = {isa = PBXBuildFile; productRef = BE1BA8092F41B2D3000FE4C0 /* SnapKit */; };
+		BE1BA80D2F41B2DF000FE4C0 /* Then in Frameworks */ = {isa = PBXBuildFile; productRef = BE1BA80C2F41B2DF000FE4C0 /* Then */; };
+		BE1BA8102F41B2FC000FE4C0 /* Toast in Frameworks */ = {isa = PBXBuildFile; productRef = BE1BA80F2F41B2FC000FE4C0 /* Toast */; };
+		BE1BA8132F41B318000FE4C0 /* RxBlocking in Frameworks */ = {isa = PBXBuildFile; productRef = BE1BA8122F41B318000FE4C0 /* RxBlocking */; };
+		BE1BA8152F41B318000FE4C0 /* RxCocoa in Frameworks */ = {isa = PBXBuildFile; productRef = BE1BA8142F41B318000FE4C0 /* RxCocoa */; };
+		BE1BA8172F41B318000FE4C0 /* RxRelay in Frameworks */ = {isa = PBXBuildFile; productRef = BE1BA8162F41B318000FE4C0 /* RxRelay */; };
+		BE1BA8192F41B318000FE4C0 /* RxSwift in Frameworks */ = {isa = PBXBuildFile; productRef = BE1BA8182F41B318000FE4C0 /* RxSwift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		BE1BA7EA2F41B235000FE4C0 /* TarotSajuTeller.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TarotSajuTeller.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -36,6 +48,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BE1BA8192F41B318000FE4C0 /* RxSwift in Frameworks */,
+				BE1BA80A2F41B2D3000FE4C0 /* SnapKit in Frameworks */,
+				BE1BA8132F41B318000FE4C0 /* RxBlocking in Frameworks */,
+				BE1BA8072F41B2C4000FE4C0 /* Kingfisher in Frameworks */,
+				BE1BA8152F41B318000FE4C0 /* RxCocoa in Frameworks */,
+				BE1BA8042F41B2B7000FE4C0 /* Alamofire in Frameworks */,
+				BE1BA8102F41B2FC000FE4C0 /* Toast in Frameworks */,
+				BE1BA8172F41B318000FE4C0 /* RxRelay in Frameworks */,
+				BE1BA80D2F41B2DF000FE4C0 /* Then in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +99,15 @@
 			);
 			name = TarotSajuTeller;
 			packageProductDependencies = (
+				BE1BA8032F41B2B7000FE4C0 /* Alamofire */,
+				BE1BA8062F41B2C4000FE4C0 /* Kingfisher */,
+				BE1BA8092F41B2D3000FE4C0 /* SnapKit */,
+				BE1BA80C2F41B2DF000FE4C0 /* Then */,
+				BE1BA80F2F41B2FC000FE4C0 /* Toast */,
+				BE1BA8122F41B318000FE4C0 /* RxBlocking */,
+				BE1BA8142F41B318000FE4C0 /* RxCocoa */,
+				BE1BA8162F41B318000FE4C0 /* RxRelay */,
+				BE1BA8182F41B318000FE4C0 /* RxSwift */,
 			);
 			productName = TarotSajuTeller;
 			productReference = BE1BA7EA2F41B235000FE4C0 /* TarotSajuTeller.app */;
@@ -107,6 +137,14 @@
 			);
 			mainGroup = BE1BA7E12F41B235000FE4C0;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				BE1BA8022F41B2B7000FE4C0 /* XCRemoteSwiftPackageReference "Alamofire" */,
+				BE1BA8052F41B2C4000FE4C0 /* XCRemoteSwiftPackageReference "Kingfisher" */,
+				BE1BA8082F41B2D3000FE4C0 /* XCRemoteSwiftPackageReference "SnapKit" */,
+				BE1BA80B2F41B2DF000FE4C0 /* XCRemoteSwiftPackageReference "Then" */,
+				BE1BA80E2F41B2FC000FE4C0 /* XCRemoteSwiftPackageReference "Toast-Swift" */,
+				BE1BA8112F41B318000FE4C0 /* XCRemoteSwiftPackageReference "RxSwift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BE1BA7EB2F41B235000FE4C0 /* Products */;
 			projectDirPath = "";
@@ -151,8 +189,9 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -161,12 +200,16 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.gucci.TarotSajuTeller;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -183,8 +226,9 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -193,12 +237,16 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.gucci.TarotSajuTeller;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -345,6 +393,105 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		BE1BA8022F41B2B7000FE4C0 /* XCRemoteSwiftPackageReference "Alamofire" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Alamofire/Alamofire";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.11.1;
+			};
+		};
+		BE1BA8052F41B2C4000FE4C0 /* XCRemoteSwiftPackageReference "Kingfisher" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/onevcat/Kingfisher.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.6.2;
+			};
+		};
+		BE1BA8082F41B2D3000FE4C0 /* XCRemoteSwiftPackageReference "SnapKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SnapKit/SnapKit.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.7.1;
+			};
+		};
+		BE1BA80B2F41B2DF000FE4C0 /* XCRemoteSwiftPackageReference "Then" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/devxoul/Then.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.0.0;
+			};
+		};
+		BE1BA80E2F41B2FC000FE4C0 /* XCRemoteSwiftPackageReference "Toast-Swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/scalessec/Toast-Swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.1.1;
+			};
+		};
+		BE1BA8112F41B318000FE4C0 /* XCRemoteSwiftPackageReference "RxSwift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/ReactiveX/RxSwift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 6.10.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		BE1BA8032F41B2B7000FE4C0 /* Alamofire */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BE1BA8022F41B2B7000FE4C0 /* XCRemoteSwiftPackageReference "Alamofire" */;
+			productName = Alamofire;
+		};
+		BE1BA8062F41B2C4000FE4C0 /* Kingfisher */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BE1BA8052F41B2C4000FE4C0 /* XCRemoteSwiftPackageReference "Kingfisher" */;
+			productName = Kingfisher;
+		};
+		BE1BA8092F41B2D3000FE4C0 /* SnapKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BE1BA8082F41B2D3000FE4C0 /* XCRemoteSwiftPackageReference "SnapKit" */;
+			productName = SnapKit;
+		};
+		BE1BA80C2F41B2DF000FE4C0 /* Then */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BE1BA80B2F41B2DF000FE4C0 /* XCRemoteSwiftPackageReference "Then" */;
+			productName = Then;
+		};
+		BE1BA80F2F41B2FC000FE4C0 /* Toast */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BE1BA80E2F41B2FC000FE4C0 /* XCRemoteSwiftPackageReference "Toast-Swift" */;
+			productName = Toast;
+		};
+		BE1BA8122F41B318000FE4C0 /* RxBlocking */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BE1BA8112F41B318000FE4C0 /* XCRemoteSwiftPackageReference "RxSwift" */;
+			productName = RxBlocking;
+		};
+		BE1BA8142F41B318000FE4C0 /* RxCocoa */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BE1BA8112F41B318000FE4C0 /* XCRemoteSwiftPackageReference "RxSwift" */;
+			productName = RxCocoa;
+		};
+		BE1BA8162F41B318000FE4C0 /* RxRelay */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BE1BA8112F41B318000FE4C0 /* XCRemoteSwiftPackageReference "RxSwift" */;
+			productName = RxRelay;
+		};
+		BE1BA8182F41B318000FE4C0 /* RxSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BE1BA8112F41B318000FE4C0 /* XCRemoteSwiftPackageReference "RxSwift" */;
+			productName = RxSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = BE1BA7E22F41B235000FE4C0 /* Project object */;
 }
