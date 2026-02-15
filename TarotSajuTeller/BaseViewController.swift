@@ -296,23 +296,62 @@ extension UICollectionViewCell: Reusable { }
 // MARK: - CardCollectionViewCell
 
 final class CardCollectionViewCell: UICollectionViewCell {
-    private let cardImageView = UIImageView().then {
-        $0.backgroundColor = .brown // 임시 색상
+
+    // 뒷면 (갈색 카드)
+    private let backView = UIImageView().then {
+        $0.backgroundColor = .brown
         $0.layer.cornerRadius = 12
         $0.clipsToBounds = true
-        $0.contentMode = .scaleAspectFill
+    }
+
+    // 앞면 (숫자 레이블)
+    private let frontView = UIView().then {
+        $0.backgroundColor = .white
+        $0.layer.cornerRadius = 12
+        $0.layer.borderWidth = 2
+        $0.layer.borderColor = UIColor.brown.cgColor
+        $0.isHidden = true // 처음엔 숨김
+    }
+
+    private let numberLabel = UILabel().then {
+        $0.textColor = .brown
+        $0.font = .systemFont(ofSize: 32, weight: .bold)
     }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        contentView.addSubview(cardImageView)
-        cardImageView.snp.makeConstraints { $0.edges.equalToSuperview() }
+        setupHierarchy()
+        setupLayout()
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
+    private func setupHierarchy() {
+        contentView.addSubview(frontView)
+        contentView.addSubview(backView)
+        frontView.addSubview(numberLabel)
+    }
+
+    private func setupLayout() {
+        backView.snp.makeConstraints { $0.edges.equalToSuperview() }
+        frontView.snp.makeConstraints { $0.edges.equalToSuperview() }
+        numberLabel.snp.makeConstraints { $0.center.equalToSuperview() }
+    }
+
     func configure(index: Int) {
-        // 이미지나 텍스트 설정
+        numberLabel.text = "\(index + 1)"
+        // 재사용 시 상태 초기화
+        backView.isHidden = false
+        frontView.isHidden = true
+    }
+
+    // 카드 뒤집기 애니메이션 함수
+    func flipCard() {
+        let transitionOptions: UIView.AnimationOptions = [.transitionFlipFromRight, .showHideTransitionViews]
+
+        UIView.transition(from: backView, to: frontView, duration: 0.5, options: transitionOptions) { _ in
+            // 애니메이션 완료 후 필요한 작업이 있다면 여기에 작성
+        }
     }
 }
 
@@ -404,7 +443,7 @@ final class SelectCardViewController: BaseViewController {
         view.backgroundColor = .systemBackground
     }
 
-        // 리턴 시 동작 보완
+    // 리턴 시 동작 보완
     private func showCardSelection() {
         inputTextField.isHidden = true
         cardCollectionView.isHidden = false
@@ -454,16 +493,26 @@ extension SelectCardViewController: UICollectionViewDataSource, UICollectionView
     func collectionView(
         _ collectionView: UICollectionView,
         cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        guard let cell = collectionView.dequeueReusableCell(
-            withReuseIdentifier: CardCollectionViewCell.identifier, for: indexPath) as? CardCollectionViewCell
+            guard let cell = collectionView.dequeueReusableCell(
+                withReuseIdentifier: CardCollectionViewCell.identifier, for: indexPath) as? CardCollectionViewCell
             else { return UICollectionViewCell() }
-        cell.configure(index: indexPath.item)
-        return cell
-    }
+            cell.configure(index: indexPath.item)
+            return cell
+        }
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        guard let cell = collectionView.cellForItem(at: indexPath) as? CardCollectionViewCell else { return }
+
         print("\(indexPath.item + 1)번째 카드가 선택되었습니다.")
-        // 여기서 결과 화면으로 이동하거나 애니메이션 처리를 수행합니다.
+
+        // 1. 카드 뒤집기 애니메이션 실행
+        cell.flipCard()
+
+        // 2. 선택 후 약간의 딜레이를 주어 결과 화면으로 이동하거나 로직 처리
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            // 여기에 결과 알럿을 띄우거나 상세 뷰로 push 하는 코드를 넣으시면 됩니다.
+            print("결과 확인 단계로 진입")
+        }
     }
 }
 
