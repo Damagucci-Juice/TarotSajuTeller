@@ -341,13 +341,19 @@ final class CardCollectionViewCell: UICollectionViewCell {
         numberLabel.snp.makeConstraints { $0.center.equalToSuperview() }
     }
 
-    func configure(index: Int) {
+    func configure(index: Int, isSelected: Bool) {
         numberLabel.text = "\(index + 1)"
 
-        // 셀이 재사용될 때를 대비해 상태 초기화
-        isFlipped = false
-        backView.isHidden = false
-        frontView.isHidden = true
+        // 데이터 배열의 상태에 따라 뷰를 즉시 설정 (애니메이션 없이)
+        self.isFlipped = isSelected
+
+        if isSelected {
+            backView.isHidden = true
+            frontView.isHidden = false
+        } else {
+            backView.isHidden = false
+            frontView.isHidden = true
+        }
     }
 
     // 카드 뒤집기 애니메이션 함수
@@ -390,7 +396,8 @@ final class SelectCardViewController: BaseViewController {
     }
 
     private var sowan: String?
-    private var cards: [String] = []
+    //    private var cards: [String] = []
+    private var selectedIndexes: Set<Int> = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -474,8 +481,8 @@ final class SelectCardViewController: BaseViewController {
 
         layout.minimumLineSpacing = lineSpacing
         layout.minimumInteritemSpacing = interSpacing
-        let itemPerRow = 3.0
-        let itemPerCol = 3.0
+        let itemPerRow = 5.0
+        let itemPerCol = 5.0
         let screenWidth = view.window?.windowScene?.screen.bounds.width ?? .zero
         let availableWidth = screenWidth - (hInset * 2) - (interSpacing * (itemPerRow - 1))
         let cellWidth = availableWidth / itemPerRow
@@ -498,32 +505,39 @@ extension SelectCardViewController: UICollectionViewDataSource, UICollectionView
         return 22 // 타로 카드 기준 22장 또는 원하는 갯수
     }
 
-    func collectionView(
-        _ collectionView: UICollectionView,
-        cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-            guard let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: CardCollectionViewCell.identifier, for: indexPath) as? CardCollectionViewCell
-            else { return UICollectionViewCell() }
-            cell.configure(index: indexPath.item)
-            return cell
-        }
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        guard let cell = collectionView.dequeueReusableCell(
+            withReuseIdentifier: CardCollectionViewCell.identifier, for: indexPath) as? CardCollectionViewCell
+        else { return UICollectionViewCell() }
+
+        // 현재 인덱스가 선택된 목록에 있는지 확인하여 전달
+        let isSelected = selectedIndexes.contains(indexPath.item)
+        cell.configure(index: indexPath.item, isSelected: isSelected)
+
+        return cell
+    }
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        guard let cell = collectionView.cellForItem(at: indexPath) as? CardCollectionViewCell else { return }
-        guard cards.count < 3 else {
+        // 이미 선택된 카드라면 무시
+        if selectedIndexes.contains(indexPath.item) { return }
+
+        guard selectedIndexes.count < 3 else {
             print("더 이상 고를 수 없어요")
             return
         }
+
+        guard let cell = collectionView.cellForItem(at: indexPath) as? CardCollectionViewCell else { return }
+
+        // 1. 상태 업데이트 및 애니메이션 실행
+        selectedIndexes.insert(indexPath.item)
+        cell.flipCard()
+
         print("\(indexPath.item + 1)번째 카드가 선택되었습니다.")
 
-        // 1. 카드 뒤집기 애니메이션 실행
-        cell.flipCard()
-        cards.append("\(indexPath.item)")
-        guard cards.count == 3 else { return }
-        // 2. 선택 후 약간의 딜레이를 주어 결과 화면으로 이동하거나 로직 처리
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-            // 여기에 결과 알럿을 띄우거나 상세 뷰로 push 하는 코드를 넣으시면 됩니다.
-            print("3개 선택 완료!")
+        if selectedIndexes.count == 3 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                print("3개 선택 완료!")
+            }
         }
     }
 }
