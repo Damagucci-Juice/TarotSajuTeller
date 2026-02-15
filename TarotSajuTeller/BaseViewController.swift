@@ -297,6 +297,9 @@ extension UICollectionViewCell: Reusable { }
 
 final class CardCollectionViewCell: UICollectionViewCell {
 
+    // 카드가 뒤집혔는지 상태를 저장하는 변수
+    private var isFlipped = false
+
     // 뒷면 (갈색 카드)
     private let backView = UIImageView().then {
         $0.backgroundColor = .brown
@@ -340,17 +343,21 @@ final class CardCollectionViewCell: UICollectionViewCell {
 
     func configure(index: Int) {
         numberLabel.text = "\(index + 1)"
-        // 재사용 시 상태 초기화
+
+        // 셀이 재사용될 때를 대비해 상태 초기화
+        isFlipped = false
         backView.isHidden = false
         frontView.isHidden = true
     }
 
     // 카드 뒤집기 애니메이션 함수
     func flipCard() {
+        guard !isFlipped else { return }
         let transitionOptions: UIView.AnimationOptions = [.transitionFlipFromRight, .showHideTransitionViews]
 
-        UIView.transition(from: backView, to: frontView, duration: 0.5, options: transitionOptions) { _ in
+        UIView.transition(from: backView, to: frontView, duration: 0.5, options: transitionOptions) { [weak self] _ in
             // 애니메이션 완료 후 필요한 작업이 있다면 여기에 작성
+            self?.isFlipped = true
         }
     }
 }
@@ -383,6 +390,7 @@ final class SelectCardViewController: BaseViewController {
     }
 
     private var sowan: String?
+    private var cards: [String] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -502,16 +510,20 @@ extension SelectCardViewController: UICollectionViewDataSource, UICollectionView
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         guard let cell = collectionView.cellForItem(at: indexPath) as? CardCollectionViewCell else { return }
-
+        guard cards.count < 3 else {
+            print("더 이상 고를 수 없어요")
+            return
+        }
         print("\(indexPath.item + 1)번째 카드가 선택되었습니다.")
 
         // 1. 카드 뒤집기 애니메이션 실행
         cell.flipCard()
-
+        cards.append("\(indexPath.item)")
+        guard cards.count == 3 else { return }
         // 2. 선택 후 약간의 딜레이를 주어 결과 화면으로 이동하거나 로직 처리
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
             // 여기에 결과 알럿을 띄우거나 상세 뷰로 push 하는 코드를 넣으시면 됩니다.
-            print("결과 확인 단계로 진입")
+            print("3개 선택 완료!")
         }
     }
 }
