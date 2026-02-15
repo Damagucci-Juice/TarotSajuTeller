@@ -60,10 +60,12 @@ final class MainViewController: BaseViewController {
     private let resultLabel = UILabel().then { lbl in
         lbl.textColor = .black
         lbl.numberOfLines = 0
+        lbl.text = "생일을 입력하세요"
     }
 
     private let callButton = UIButton().then { btn in
-        btn.setTitle("요청하기", for: .normal)
+        btn.setTitle("3카드 뽑기", for: .normal)
+        btn.setTitleColor(.black, for: .normal)
     }
 
     override func viewDidLoad() {
@@ -86,6 +88,7 @@ final class MainViewController: BaseViewController {
 
         callButton.snp.makeConstraints { make in
             make.center.equalToSuperview()
+            make.size.equalTo(200)
         }
     }
 
@@ -99,7 +102,11 @@ final class MainViewController: BaseViewController {
 
     @objc
     private func callButtonAction() {
+        print(#function)
+        // 생일 정보 있으면 쓰고 아니면 바로 타로 카드
         fetchSolar()
+        let selectVC = SelectCardViewController()
+        navigationController?.pushViewController(selectVC, animated: true)
     }
 
     private func fetchSolar() {
@@ -113,7 +120,7 @@ final class MainViewController: BaseViewController {
                 case .failure(let error):
                     self.view.makeToast(error.localizedDescription)
                 }
-        }
+            }
     }
 }
 
@@ -183,20 +190,20 @@ struct LunaItem: Decodable, CustomStringConvertible {
     let solJd: Int
 
     var description: String {
-            return """
+        return """
             --- 🗓️ 변환 결과 ---
             [양력] \(solYear)년 \(solMonth)월 \(solDay)일 (\(solWeek)요일)
             [음력] \(lunYear)년 \(lunMonth)월 \(lunDay)일 (\(lunLeapmonth == "평" ? "평달" : "윤달"))
-
+            
             --- 🔮 사주 원국 (삼주) ---
             년주(年柱): \(lunSecha)
             월주(月柱): \(lunWolgeon)
             일주(日柱): \(lunIljin)
-
+            
             * 시주(時柱)는 태어난 시간을 입력하면 계산이 가능합니다.
             -------------------
             """
-        }
+    }
 }
 
 enum TaroRouter: URLRequestConvertible {
@@ -264,5 +271,76 @@ final class NetworkService {
         } catch {
             completion(.failure(.unknown))
         }
+    }
+}
+
+// MARK: - SelectCardViewController
+final class SelectCardViewController: BaseViewController {
+
+    private let inputTextField = UITextField().then { tfd in
+        let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: 10, height: 0))
+        tfd.leftView = paddingView
+        tfd.leftViewMode = .always
+        tfd.placeholder = "진심을 담아 소원을 입력하세요"
+        tfd.backgroundColor = .secondarySystemBackground
+        tfd.layer.cornerRadius = 8
+        tfd.returnKeyType = .done
+    }
+
+    private let sowanLabel = UILabel().then { lbl in
+        lbl.textColor = .black
+        lbl.font = .systemFont(ofSize: 24)
+        lbl.isHidden = true
+        lbl.numberOfLines = 0
+        lbl.textAlignment = .center
+    }
+
+    private var sowan: String?
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+    }
+
+    // 화면이 나타날 때 포커싱 (키보드 올리기)
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        inputTextField.becomeFirstResponder()
+    }
+
+    override func setupHierarchy() {
+        super.setupHierarchy()
+        view.addSubview(inputTextField)
+        view.addSubview(sowanLabel)
+    }
+
+    override func setupLayout() {
+        super.setupLayout()
+        inputTextField.snp.makeConstraints { make in
+            make.top.equalTo(view.safeAreaLayoutGuide).offset(20)
+            make.horizontalEdges.equalToSuperview().inset(20)
+            make.height.equalTo(50)
+        }
+
+        sowanLabel.snp.makeConstraints { make in
+            make.bottom.horizontalEdges.equalToSuperview().inset(32)
+        }
+    }
+
+    override func setupView() {
+        super.setupView()
+        inputTextField.delegate = self
+        view.backgroundColor = .systemBackground
+    }
+}
+
+extension SelectCardViewController: UITextFieldDelegate {
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        // 리턴 키 클릭 시 뷰 숨기기
+        self.inputTextField.isHidden = true
+        self.sowanLabel.text = textField.text
+        self.sowanLabel.isHidden = false
+        self.sowan = textField.text
+        textField.resignFirstResponder()
+        return true
     }
 }
