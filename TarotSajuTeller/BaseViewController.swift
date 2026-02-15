@@ -4,6 +4,7 @@
 //
 //  Created by Gucci on 2/15/26.
 //
+// swiftlint:disable file_length
 
 import UIKit
 import Alamofire
@@ -274,14 +275,56 @@ final class NetworkService {
     }
 }
 
+protocol Reusable: AnyObject {
+    static var identifier: String { get }
+}
+
+extension Reusable {
+    static var identifier: String {
+        return String(describing: self)
+    }
+}
+
+extension UIViewController: Reusable { }
+
+extension UITableViewCell: Reusable { }
+
+
+extension UICollectionViewCell: Reusable { }
+
+
+// MARK: - CardCollectionViewCell
+
+final class CardCollectionViewCell: UICollectionViewCell {
+    private let cardImageView = UIImageView().then {
+        $0.backgroundColor = .brown // 임시 색상
+        $0.layer.cornerRadius = 12
+        $0.clipsToBounds = true
+        $0.contentMode = .scaleAspectFill
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        contentView.addSubview(cardImageView)
+        cardImageView.snp.makeConstraints { $0.edges.equalToSuperview() }
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func configure(index: Int) {
+        // 이미지나 텍스트 설정
+    }
+}
+
 // MARK: - SelectCardViewController
+
 final class SelectCardViewController: BaseViewController {
 
     private let inputTextField = UITextField().then { tfd in
         let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: 10, height: 0))
         tfd.leftView = paddingView
         tfd.leftViewMode = .always
-        tfd.placeholder = "진심을 담아 소원을 입력하세요"
+        tfd.placeholder = "진심을 담아 질문을 입력하세요"
         tfd.backgroundColor = .secondarySystemBackground
         tfd.layer.cornerRadius = 8
         tfd.returnKeyType = .done
@@ -289,10 +332,15 @@ final class SelectCardViewController: BaseViewController {
 
     private let sowanLabel = UILabel().then { lbl in
         lbl.textColor = .black
-        lbl.font = .systemFont(ofSize: 24)
+        lbl.font = .systemFont(ofSize: 16)
         lbl.isHidden = true
         lbl.numberOfLines = 0
         lbl.textAlignment = .center
+    }
+
+    private let cardCollectionView = UICollectionView(frame: .zero, collectionViewLayout: .init())
+    private let contentView = UIView().then { view in
+        view.backgroundColor = .lightGray
     }
 
     private var sowan: String?
@@ -310,7 +358,9 @@ final class SelectCardViewController: BaseViewController {
     override func setupHierarchy() {
         super.setupHierarchy()
         view.addSubview(inputTextField)
+        view.addSubview(cardCollectionView)
         view.addSubview(sowanLabel)
+        cardCollectionView.addSubview(contentView)
     }
 
     override func setupLayout() {
@@ -321,6 +371,16 @@ final class SelectCardViewController: BaseViewController {
             make.height.equalTo(50)
         }
 
+        cardCollectionView.snp.makeConstraints { make in
+            make.top.horizontalEdges.equalTo(view.safeAreaLayoutGuide)
+            make.bottom.equalTo(sowanLabel.snp.top)
+        }
+
+        contentView.snp.makeConstraints { make in
+            make.edges.equalTo(cardCollectionView.contentLayoutGuide)
+            make.height.equalTo(cardCollectionView.frameLayoutGuide)
+        }
+
         sowanLabel.snp.makeConstraints { make in
             make.bottom.horizontalEdges.equalToSuperview().inset(32)
         }
@@ -329,18 +389,90 @@ final class SelectCardViewController: BaseViewController {
     override func setupView() {
         super.setupView()
         inputTextField.delegate = self
+
+        // 콜렉션뷰 설정
+        cardCollectionView.delegate = self
+        cardCollectionView.dataSource = self
+        cardCollectionView.register(
+            CardCollectionViewCell.self,
+            forCellWithReuseIdentifier: CardCollectionViewCell.identifier
+        )
+        cardCollectionView.isHidden = true // 처음엔 숨김
+        cardCollectionView.showsHorizontalScrollIndicator = false
+        cardCollectionView.showsVerticalScrollIndicator = false
+
         view.backgroundColor = .systemBackground
+    }
+
+        // 리턴 시 동작 보완
+    private func showCardSelection() {
+        inputTextField.isHidden = true
+        cardCollectionView.isHidden = false
+        sowanLabel.isHidden = false
+        sowanLabel.text = "\(sowan ?? "")"
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        cardCollectionView.collectionViewLayout = layout()
+    }
+
+    func layout() -> UICollectionViewFlowLayout {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .horizontal
+        let hInset = 5.0
+        let vInset = 5.0
+        let lineSpacing = 4.0
+        let interSpacing = 4.0
+
+        layout.minimumLineSpacing = lineSpacing
+        layout.minimumInteritemSpacing = interSpacing
+        let itemPerRow = 3.0
+        let itemPerCol = 3.0
+        let screenWidth = view.window?.windowScene?.screen.bounds.width ?? .zero
+        let availableWidth = screenWidth - (hInset * 2) - (interSpacing * (itemPerRow - 1))
+        let cellWidth = availableWidth / itemPerRow
+
+        let collectionViewHeight = cardCollectionView.bounds.height
+        let availableHeight = collectionViewHeight - (vInset * 2) - (lineSpacing * (itemPerCol))
+        let cellHeight = availableHeight / itemPerCol - 3
+        layout.itemSize = CGSize(
+            width: cellWidth,
+            height: cellHeight)
+        layout.sectionInset = UIEdgeInsets(top: vInset, left: hInset, bottom: vInset, right: hInset)
+        return layout
     }
 }
 
+// MARK: - CollectionView DataSource & Delegate
+extension SelectCardViewController: UICollectionViewDataSource, UICollectionViewDelegate {
+
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return 22 // 타로 카드 기준 22장 또는 원하는 갯수
+    }
+
+    func collectionView(
+        _ collectionView: UICollectionView,
+        cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        guard let cell = collectionView.dequeueReusableCell(
+            withReuseIdentifier: CardCollectionViewCell.identifier, for: indexPath) as? CardCollectionViewCell
+            else { return UICollectionViewCell() }
+        cell.configure(index: indexPath.item)
+        return cell
+    }
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        print("\(indexPath.item + 1)번째 카드가 선택되었습니다.")
+        // 여기서 결과 화면으로 이동하거나 애니메이션 처리를 수행합니다.
+    }
+}
+
+// MARK: - TextField Delegate
 extension SelectCardViewController: UITextFieldDelegate {
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        // 리턴 키 클릭 시 뷰 숨기기
-        self.inputTextField.isHidden = true
-        self.sowanLabel.text = textField.text
-        self.sowanLabel.isHidden = false
         self.sowan = textField.text
         textField.resignFirstResponder()
+        showCardSelection() // 카드 화면 표시 함수 호출
         return true
     }
 }
