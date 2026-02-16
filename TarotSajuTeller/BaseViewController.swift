@@ -289,36 +289,29 @@ extension UIViewController: Reusable { }
 
 extension UITableViewCell: Reusable { }
 
-
 extension UICollectionViewCell: Reusable { }
-
 
 // MARK: - CardCollectionViewCell
 
 final class CardCollectionViewCell: UICollectionViewCell {
 
-    // 카드가 뒤집혔는지 상태를 저장하는 변수
     private var isFlipped = false
+    private var cardData: TarotCard? // 카드 데이터를 저장할 변수 추가
 
-    // 뒷면 (갈색 카드)
-    private let backView = UIImageView().then {
-        $0.backgroundColor = .brown
+    // 뒷면 이미지뷰 (공통 이미지)
+    private let backImageView = UIImageView().then {
+        $0.image = UIImage(named: "tarot_back.jpg")
+        $0.contentMode = .scaleAspectFill
         $0.layer.cornerRadius = 12
         $0.clipsToBounds = true
     }
 
-    // 앞면 (숫자 레이블)
-    private let frontView = UIView().then {
-        $0.backgroundColor = .white
+    // 앞면 이미지뷰 (카드별 고유 이미지)
+    private let frontImageView = UIImageView().then {
+        $0.contentMode = .scaleAspectFill
         $0.layer.cornerRadius = 12
-        $0.layer.borderWidth = 2
-        $0.layer.borderColor = UIColor.brown.cgColor
+        $0.clipsToBounds = true
         $0.isHidden = true // 처음엔 숨김
-    }
-
-    private let numberLabel = UILabel().then {
-        $0.textColor = .brown
-        $0.font = .systemFont(ofSize: 32, weight: .bold)
     }
 
     override init(frame: CGRect) {
@@ -330,41 +323,62 @@ final class CardCollectionViewCell: UICollectionViewCell {
     required init?(coder: NSCoder) { fatalError() }
 
     private func setupHierarchy() {
-        contentView.addSubview(frontView)
-        contentView.addSubview(backView)
-        frontView.addSubview(numberLabel)
+        contentView.addSubview(frontImageView)
+        contentView.addSubview(backImageView)
     }
 
     private func setupLayout() {
-        backView.snp.makeConstraints { $0.edges.equalToSuperview() }
-        frontView.snp.makeConstraints { $0.edges.equalToSuperview() }
-        numberLabel.snp.makeConstraints { $0.center.equalToSuperview() }
+        backImageView.snp.makeConstraints { $0.edges.equalToSuperview() }
+        frontImageView.snp.makeConstraints { $0.edges.equalToSuperview() }
     }
 
-    func configure(index: Int, isSelected: Bool) {
-        numberLabel.text = "\(index + 1)"
-
-        // 데이터 배열의 상태에 따라 뷰를 즉시 설정 (애니메이션 없이)
+    // 💡 TarotCard 객체를 받아 셀을 설정합니다.
+    func configure(with card: TarotCard, isSelected: Bool) {
+        self.cardData = card
         self.isFlipped = isSelected
 
-        if isSelected {
-            backView.isHidden = true
-            frontView.isHidden = false
+        // 앞면 이미지 설정
+        frontImageView.image = UIImage(named: card.imageName)
+
+        // 💡 역방향 처리: 이전에 정의한 isReversed가 true라면 180도 회전
+        if card.isReversed {
+            frontImageView.transform = CGAffineTransform(rotationAngle: .pi)
         } else {
-            backView.isHidden = false
-            frontView.isHidden = true
+            frontImageView.transform = .identity
+        }
+
+        // 재사용 시 상태 초기화
+        if isSelected {
+            backImageView.isHidden = true
+            frontImageView.isHidden = false
+        } else {
+            backImageView.isHidden = false
+            frontImageView.isHidden = true
         }
     }
 
-    // 카드 뒤집기 애니메이션 함수
     func flipCard() {
         guard !isFlipped else { return }
+
+        // 💡 UIView.transition을 사용한 카드 뒤집기 애니메이션
         let transitionOptions: UIView.AnimationOptions = [.transitionFlipFromRight, .showHideTransitionViews]
 
-        UIView.transition(from: backView, to: frontView, duration: 0.5, options: transitionOptions) { [weak self] _ in
-            // 애니메이션 완료 후 필요한 작업이 있다면 여기에 작성
+        UIView.transition(
+            from: backImageView,
+            to: frontImageView,
+            duration: 0.6,
+            options: transitionOptions) { [weak self] _ in
             self?.isFlipped = true
         }
+    }
+
+    // 💡 셀이 재사용될 때 초기화 처리
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        isFlipped = false
+        backImageView.isHidden = false
+        frontImageView.isHidden = true
+        frontImageView.transform = .identity // 회전값 초기화
     }
 }
 
@@ -396,12 +410,8 @@ final class SelectCardViewController: BaseViewController {
     }
 
     private var sowan: String?
-    //    private var cards: [String] = []
-    private var selectedIndexes: Set<Int> = []
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-    }
+    private var selectedCards: Set<TarotCard> = []
+    private let tarotCards = TarotData.allCards.shuffled()
 
     // 화면이 나타날 때 포커싱 (키보드 올리기)
     override func viewDidAppear(_ animated: Bool) {
@@ -502,7 +512,7 @@ final class SelectCardViewController: BaseViewController {
 extension SelectCardViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return 22 // 타로 카드 기준 22장 또는 원하는 갯수
+        tarotCards.count
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
@@ -511,17 +521,18 @@ extension SelectCardViewController: UICollectionViewDataSource, UICollectionView
         else { return UICollectionViewCell() }
 
         // 현재 인덱스가 선택된 목록에 있는지 확인하여 전달
-        let isSelected = selectedIndexes.contains(indexPath.item)
-        cell.configure(index: indexPath.item, isSelected: isSelected)
-
+        let card = tarotCards[indexPath.item]
+        let isSelected = selectedCards.contains(card)
+        cell.configure(with: card, isSelected: isSelected)
         return cell
     }
 
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         // 이미 선택된 카드라면 무시
-        if selectedIndexes.contains(indexPath.item) { return }
+        let card = tarotCards[indexPath.item]
+        if selectedCards.contains(card) { return }
 
-        guard selectedIndexes.count < 3 else {
+        guard selectedCards.count < 3 else {
             print("더 이상 고를 수 없어요")
             return
         }
@@ -529,12 +540,12 @@ extension SelectCardViewController: UICollectionViewDataSource, UICollectionView
         guard let cell = collectionView.cellForItem(at: indexPath) as? CardCollectionViewCell else { return }
 
         // 1. 상태 업데이트 및 애니메이션 실행
-        selectedIndexes.insert(indexPath.item)
+        selectedCards.insert(card)
         cell.flipCard()
 
         print("\(indexPath.item + 1)번째 카드가 선택되었습니다.")
 
-        if selectedIndexes.count == 3 {
+        if selectedCards.count == 3 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                 print("3개 선택 완료!")
             }
@@ -550,4 +561,62 @@ extension SelectCardViewController: UITextFieldDelegate {
         showCardSelection() // 카드 화면 표시 함수 호출
         return true
     }
+}
+
+// MARK: - Tarot
+
+enum TarotSuit: String, CaseIterable {
+    case major = "메이저"
+    case wands = "완드"
+    case cups = "컵"
+    case swords = "소드"
+    case pentacles = "펜타클"
+}
+
+struct TarotCard: Hashable, Identifiable {
+    let id: Int
+    let name: String
+    let suit: TarotSuit
+    var isReversed: Bool = false // 역방향 여부 (기본값 정방향)
+    var description: String = "" // 해석 내용
+
+    // 이미지 파일명 자동 생성: "tarot_0.jpg" 형식
+    var imageName: String {
+        return "tarot_\(id).jpg"
+    }
+}
+
+struct TarotData {
+    static let allCards: [TarotCard] = {
+        var cards: [TarotCard] = []
+
+        // 1. 메이저 아르카나 이름 정의 (0~21)
+        let majorNames = [
+            "광대", "마법사", "고위 여사제", "여황제", "황제",
+            "교황", "연인", "전차", "힘", "은둔자",
+            "운명의 수레바퀴", "정의", "매달린 사람", "죽음", "절제",
+            "악마", "탑", "별", "달", "태양", "심판", "세계"
+        ]
+
+        for (index, name) in majorNames.enumerated() {
+            cards.append(TarotCard(id: index, name: name, suit: .major))
+        }
+
+        // 2. 마이너 아르카나 생성 (22~77)
+        let minorSuits: [TarotSuit] = [.wands, .cups, .swords, .pentacles]
+        let ranks = ["Ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "Page", "Knight", "Queen", "King"]
+
+        var currentId = 22
+        for suit in minorSuits {
+            for rank in ranks {
+                let name = "\(suit.rawValue) \(rank)"
+                cards.append(TarotCard(id: currentId, name: name, suit: suit))
+                currentId += 1
+            }
+        }
+
+        return cards
+    }()
+
+    private init() { }
 }
