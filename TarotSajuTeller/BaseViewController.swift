@@ -847,20 +847,57 @@ final class TarotResultViewController: BaseViewController {
     }
 
     @objc private func aiButtonTapped(_ sender: UIButton) {
-        copyTarotResultToPasteboard()
+        // 1. 먼저 텍스트를 생성합니다. (아직 클립보드에 넣지는 않음)
+        let spreadPositions = ["과거", "현재", "미래"]
+        let cardInfoList = cards.enumerated().map { (index, card) in
+            let position = index < spreadPositions.count ? spreadPositions[index] : "카드 \(index + 1)"
+            let direction = card.isReversed ? "(역방향)" : "(정방향)"
+            return "• [\(position)] \(card.name) \(direction)"
+        }.joined(separator: "\n")
 
+        let copyText = """
+        "\(hope)"라는 질문으로 점을 보려고 3 카드 스프레드를 사용해서 타로카드를 뽑았다.
+        뽑은 카드는
+        \(cardInfoList) 이다.
+        이 카드를 어떻게 해석해야 할까? 사주와 함께 분석해줘.
+        """
+
+        // 2. 사용자에게 보여줄 앱 이름과 스킴 설정
+        let aiApps = ["ChatGPT", "Gemini", "Claude"]
         let schemes = ["chatgpt://", "googlegemini://", "claude://"]
+        let appName = aiApps[sender.tag]
         let selectedScheme = schemes[sender.tag]
 
-        if let url = URL(string: selectedScheme), UIApplication.shared.canOpenURL(url) {
-            UIApplication.shared.open(url)
-        } else {
-            // 앱이 설치되어 있지 않을 경우 알림
-            let alert = UIAlertController(title: "알림", message: "\(sender.currentTitle ?? "해당") 앱이 설치되어 있지 않습니다.", preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "확인", style: .default))
-            self.present(alert, animated: true)
+        // 3. 확인 Alert 띄우기
+        let alert = UIAlertController(
+            title: "\(appName)로 이동하시겠습니까?",
+            message: "\n[질문]\n\(copyText)",
+            preferredStyle: .alert
+        )
+
+        // '이동 및 복사' 버튼 클릭 시 실질적인 동작 수행
+        let confirmAction = UIAlertAction(title: "복사 후 이동", style: .default) { [weak self] _ in
+            // 클립보드 저장 및 햅틱
+            UIPasteboard.general.string = copyText
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+
+            // 앱 실행
+            if let url = URL(string: selectedScheme), UIApplication.shared.canOpenURL(url) {
+                UIApplication.shared.open(url)
+            } else {
+                self?.view.makeToast("\(appName) 앱이 설치되어 있지 않습니다.")
+            }
         }
+
+        let cancelAction = UIAlertAction(title: "취소", style: .cancel)
+
+        alert.addAction(confirmAction)
+        alert.addAction(cancelAction)
+
+        self.present(alert, animated: true)
     }
+
     @objc private func closeButtonTapped() {
         // 앱의 첫 화면(RootViewController)으로 이동
         self.navigationController?.popToRootViewController(animated: true)
