@@ -847,7 +847,17 @@ final class TarotResultViewController: BaseViewController {
     }
 
     @objc private func aiButtonTapped(_ sender: UIButton) {
-        // 1. 먼저 텍스트를 생성합니다. (아직 클립보드에 넣지는 않음)
+        // 1. 저장된 사주 데이터 불러오기
+        let sYear = UserDefaults.standard.string(forKey: UDKey.sajuYear) ?? ""
+        let sMonth = UserDefaults.standard.string(forKey: UDKey.sajuMonth) ?? ""
+        let sDay = UserDefaults.standard.string(forKey: UDKey.sajuDay) ?? ""
+        let sHour = UserDefaults.standard.string(forKey: UDKey.sajuHour) ?? ""
+
+        // 사주 데이터 존재 여부 확인
+        let hasSajuData = !sDay.isEmpty
+        let sajuText = hasSajuData ? "\n[나의 사주 정보]\n년주: \(sYear), 월주: \(sMonth), 일주: \(sDay), 시주: \(sHour)\n" : ""
+
+        // 2. 타로 카드 리스트 생성
         let spreadPositions = ["과거", "현재", "미래"]
         let cardInfoList = cards.enumerated().map { (index, card) in
             let position = index < spreadPositions.count ? spreadPositions[index] : "카드 \(index + 1)"
@@ -855,34 +865,37 @@ final class TarotResultViewController: BaseViewController {
             return "• [\(position)] \(card.name) \(direction)"
         }.joined(separator: "\n")
 
+        // 3. 통합 질문 생성
+        // 사주 데이터가 있으면 결합 분석 요청을, 없으면 타로 중심 분석 요청을 포함합니다.
+        let analysisRequest = hasSajuData ? "타로 카드와 사주 정보를 결합해서 설명해줘." : "이 타로 카드들을 상세히 분석해줘."
+
         let copyText = """
         "\(hope)"라는 질문으로 점을 보려고 3 카드 스프레드를 사용해서 타로카드를 뽑았다.
+        
         뽑은 카드는
         \(cardInfoList) 이다.
-        이 카드를 어떻게 해석해야 할까? 사주와 함께 분석해줘.
+        \(sajuText)
+        \(analysisRequest)
         """
 
-        // 2. 사용자에게 보여줄 앱 이름과 스킴 설정
+        // 4. 앱 정보 및 스킴 설정
         let aiApps = ["ChatGPT", "Gemini", "Claude"]
         let schemes = ["chatgpt://", "googlegemini://", "claude://"]
         let appName = aiApps[sender.tag]
         let selectedScheme = schemes[sender.tag]
 
-        // 3. 확인 Alert 띄우기
+        // 5. 확인 Alert 띄우기
         let alert = UIAlertController(
             title: "\(appName)로 이동하시겠습니까?",
-            message: "\n[질문]\n\(copyText)",
+            message: "\n[복사될 질문 미리보기]\n\n\(copyText)",
             preferredStyle: .alert
         )
 
-        // '이동 및 복사' 버튼 클릭 시 실질적인 동작 수행
         let confirmAction = UIAlertAction(title: "복사 후 이동", style: .default) { [weak self] _ in
-            // 클립보드 저장 및 햅틱
             UIPasteboard.general.string = copyText
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
 
-            // 앱 실행
             if let url = URL(string: selectedScheme), UIApplication.shared.canOpenURL(url) {
                 UIApplication.shared.open(url)
             } else {
@@ -891,7 +904,6 @@ final class TarotResultViewController: BaseViewController {
         }
 
         let cancelAction = UIAlertAction(title: "취소", style: .cancel)
-
         alert.addAction(confirmAction)
         alert.addAction(cancelAction)
 
@@ -966,41 +978,67 @@ struct SajuResult {
     let day: String
     let hour: String
 }
-
 final class SajuManager {
     static let shared = SajuManager()
     private init() {}
 
+    // 💡 Key를 한글로 수정하여 API 결과값("병인")과 일치시킵니다.
+    private let siduTable: [String: String] = [
+        "갑": "갑", "기": "갑", "을": "병", "경": "병",
+        "병": "무", "신": "무", "정": "경", "임": "경",
+        "무": "임", "계": "임",
+        // 한자로 올 경우를 대비한 백업
+        "甲": "甲", "己": "甲", "乙": "丙", "庚": "丙",
+        "丙": "戊", "辛": "戊", "丁": "庚", "壬": "庚",
+        "戊": "壬", "癸": "壬"
+    ]
+
+    private let skyStems = ["갑", "을", "병", "정", "무", "기", "경", "신", "임", "계"]
+
     func getAdjustedDate(date: Date, time: Date) -> Date {
         let calendar = Calendar.current
-
-        // 1. 선택한 날짜(date)에서 년/월/일 추출
-        let dateComp = calendar.dateComponents([.year, .month, .day], from: date)
-        // 2. 선택한 시간(time)에서 시/분 추출
+        var components = calendar.dateComponents([.year, .month, .day], from: date)
         let timeComp = calendar.dateComponents([.hour, .minute], from: time)
+        components.hour = timeComp.hour
+        components.minute = timeComp.minute
 
-        // 3. 두 컴포넌트 병합 (원본 입력 시간: 예 23:30)
-        var combinedComp = DateComponents()
-        combinedComp.year = dateComp.year
-        combinedComp.month = dateComp.month
-        combinedComp.day = dateComp.day
-        combinedComp.hour = timeComp.hour
-        combinedComp.minute = timeComp.minute
-
-        guard let combinedDate = calendar.date(from: combinedComp) else { return date }
-
-        // 4. 서울 시간 보정 (-30분)
-        // 23:30 -> 23:00 (여전히 당일 자시)
+        guard let combinedDate = calendar.date(from: components) else { return date }
+        // 서울 표준시 보정 (-30분)
         let seoulTimeDate = combinedDate.addingTimeInterval(-30 * 60)
 
-        // 5. 자시 처리: 보정 후 시간이 23시~익일 01시 사이라면 다음 날로 간주
-        // 사주 명리학 기준: 밤 23시부터는 다음 날의 일진(日辰)을 사용함
         let adjustedHour = calendar.component(.hour, from: seoulTimeDate)
+        // 자시일 경우 다음날로 처리
         if adjustedHour >= 23 {
             return calendar.date(byAdding: .day, value: 1, to: seoulTimeDate) ?? seoulTimeDate
         }
-
         return seoulTimeDate
+    }
+
+    func validateAndFix(apiItem: LunaItem, inputDate: Date) -> (month: String, hour: String) {
+        let correctedMonth = apiItem.lunWolgeon
+
+        // 1. 일간 추출 (한글 "병" 추출)
+        let iljin = apiItem.lunIljin
+        let ilgan = String(iljin.prefix(1))
+
+        // 2. 시두법 테이블 매핑 확인
+        guard let startGan = siduTable[ilgan] else {
+            return (correctedMonth, "알 수 없음")
+        }
+
+        let calendar = Calendar.current
+        // inputDate는 이미 -30분 보정이 완료된 getAdjustedDate의 결과물이어야 함
+        let hour = calendar.component(.hour, from: inputDate)
+
+        let hourIdx = (hour + 1) / 2 % 12
+        let branches = ["자", "축", "인", "묘", "진", "사", "오", "미", "신", "유", "술", "해"]
+
+        // 4. 천간 인덱스 순환 계산
+        let startGanIdx = skyStems.firstIndex(of: startGan) ?? 0
+        let currentGan = skyStems[(startGanIdx + hourIdx) % 10]
+
+        let finalHourSaju = "\(currentGan)\(branches[hourIdx])"
+        return (correctedMonth, finalHourSaju)
     }
 }
 
@@ -1129,21 +1167,19 @@ final class ProfileViewController: BaseViewController {
     @objc private func saveButtonTapped() {
         guard let name = nameTextField.text, !name.isEmpty else { return }
 
-        // 사용자가 피커에서 선택한 '진짜 원본' 값
         let inputDate = datePicker.date
         let inputTime = timePicker.date
 
-        // 1. UI 복원용 데이터 저장 (보정 전)
+        // 보정된 날짜 계산
+        let adjustedDate = SajuManager.shared.getAdjustedDate(date: inputDate, time: inputTime)
+
         UserDefaults.standard.set(name, forKey: UDKey.name)
         UserDefaults.standard.set(genderSegment.selectedSegmentIndex, forKey: UDKey.gender)
         UserDefaults.standard.set(inputDate, forKey: UDKey.birthDate)
-        UserDefaults.standard.set(inputTime, forKey: "user_birth_time") // 시간 데이터 별도 보존
+        UserDefaults.standard.set(inputTime, forKey: "user_birth_time")
 
-        // 2. 사주 계산용 보정 (로직 내부에서만 사용)
-        let adjustedDate = SajuManager.shared.getAdjustedDate(date: inputDate, time: inputTime)
-
-        // 3. 보정된 날짜(익일 자시 반영)로 API 호출
-        fetchSolar(date: adjustedDate)
+        // 보정된 날짜를 전달하여 API 호출 및 시주 계산
+        fetchSolar(date: adjustedDate, originalTime: inputTime)
     }
 
     private func configureUIWithSavedData() {
@@ -1160,7 +1196,7 @@ final class ProfileViewController: BaseViewController {
         }
     }
 
-    private func fetchSolar(date: Date) {
+    private func fetchSolar(date: Date, originalTime: Date) {
         let calendar = Calendar.current
         let year = calendar.component(.year, from: date)
         let month = calendar.component(.month, from: date)
@@ -1168,29 +1204,29 @@ final class ProfileViewController: BaseViewController {
 
         let dto = SolarRequestDTO(solarDay: day, solarMonth: month, solarYear: year)
 
-        NetworkService.shared.fetch(
-            .solarToLuna(requestDto: dto),
-            type: SolarToLunaResponse.self) { [weak self] result in
-                switch result {
-                case .success(let answer):
-                    let item = answer.response.body.items.item
+        NetworkService.shared.fetch(.solarToLuna(requestDto: dto), type: SolarToLunaResponse.self) { [weak self] result in
+            switch result {
+            case .success(let answer):
+                let item = answer.response.body.items.item
 
-                    // 💡 4. API에서 받은 실제 값을 UserDefaults에 저장 (더 이상 고정값 아님)
-                    UserDefaults.standard.set(item.lunSecha, forKey: UDKey.sajuYear)   // 년주
-                    UserDefaults.standard.set(item.lunWolgeon, forKey: UDKey.sajuMonth) // 월주
-                    UserDefaults.standard.set(item.lunIljin, forKey: UDKey.sajuDay)     // 일주
+                // 💡 엣지케이스 보정 로직 가동
+                let fixedData = SajuManager.shared.validateAndFix(apiItem: item, inputDate: originalTime)
 
-                    // 시주는 로컬 로직으로 계산하거나 별도 처리
-                    UserDefaults.standard.set("시간 데이터", forKey: UDKey.sajuHour)
+                // 보정된 데이터 저장
+                UserDefaults.standard.set(item.lunSecha, forKey: UDKey.sajuYear)
+                UserDefaults.standard.set(fixedData.month, forKey: UDKey.sajuMonth) // 보정된 월주
+                UserDefaults.standard.set(item.lunIljin, forKey: UDKey.sajuDay)
+                UserDefaults.standard.set(fixedData.hour, forKey: UDKey.sajuHour)   // 시두법 적용 시주
 
-                    NotificationCenter.default.post(name: NSNotification.Name("BirthDateChanged"), object: nil)
+                NotificationCenter.default.post(name: NSNotification.Name("BirthDateChanged"), object: nil)
 
-                    DispatchQueue.main.async {
-                        self?.navigationController?.popViewController(animated: true)
-                    }
-                case .failure:
-                    self?.view.makeToast("사주 정보를 가져오지 못했습니다.")
+                DispatchQueue.main.async {
+                    self?.navigationController?.popViewController(animated: true)
                 }
+            case .failure:
+                self?.view.makeToast("사주 정보를 가져오지 못했습니다.")
             }
+        }
     }
+
 }
