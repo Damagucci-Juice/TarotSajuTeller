@@ -291,6 +291,25 @@ extension UITableViewCell: Reusable { }
 
 extension UICollectionViewCell: Reusable { }
 
+struct LocalImageProvider: ImageDataProvider {
+    let imageName: String
+
+    var cacheKey: String {
+        return imageName
+    }
+
+    func data(handler: @escaping (Result<Data, Error>) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            if let image = UIImage(named: imageName),
+               let data = image.pngData() {
+                handler(.success(data))
+            } else {
+                handler(.failure(NSError(domain: "LocalImageProvider", code: -1, userInfo: nil)))
+            }
+        }
+    }
+}
+
 // MARK: - CardCollectionViewCell
 
 final class CardCollectionViewCell: UICollectionViewCell {
@@ -332,31 +351,6 @@ final class CardCollectionViewCell: UICollectionViewCell {
         frontImageView.snp.makeConstraints { $0.edges.equalToSuperview() }
     }
 
-    // 💡 TarotCard 객체를 받아 셀을 설정합니다.
-    func configure(with card: TarotCard, isSelected: Bool) {
-        self.cardData = card
-        self.isFlipped = isSelected
-
-        // 앞면 이미지 설정
-        frontImageView.image = UIImage(named: card.imageName)
-
-        // 💡 역방향 처리: 이전에 정의한 isReversed가 true라면 180도 회전
-        if card.isReversed {
-            frontImageView.transform = CGAffineTransform(rotationAngle: .pi)
-        } else {
-            frontImageView.transform = .identity
-        }
-
-        // 재사용 시 상태 초기화
-        if isSelected {
-            backImageView.isHidden = true
-            frontImageView.isHidden = false
-        } else {
-            backImageView.isHidden = false
-            frontImageView.isHidden = true
-        }
-    }
-
     func flipCard() {
         guard !isFlipped else { return }
 
@@ -369,6 +363,41 @@ final class CardCollectionViewCell: UICollectionViewCell {
             duration: 0.6,
             options: transitionOptions) { [weak self] _ in
             self?.isFlipped = true
+        }
+    }
+    // Cell의 configure 메서드
+    func configure(with card: TarotCard, isSelected: Bool) {
+        self.cardData = card
+        self.isFlipped = isSelected
+
+        // Kingfisher 캐시를 활용한 로컬 이미지 다운샘플링
+        let provider = LocalImageProvider(imageName: card.imageName)
+        let processor = DownsamplingImageProcessor(size: self.bounds.size)
+
+        frontImageView.kf.indicatorType = .activity
+        frontImageView.kf.setImage(
+            with: .provider(provider),
+            options: [
+                .processor(processor),
+                .scaleFactor(UIScreen.main.scale),
+                .transition(.fade(0.2)),
+                .cacheSerializer(FormatIndicatedCacheSerializer.png),
+                .cacheOriginalImage  // 원본도 캐싱
+            ]
+        )
+
+        if card.isReversed {
+            frontImageView.transform = CGAffineTransform(rotationAngle: .pi)
+        } else {
+            frontImageView.transform = .identity
+        }
+
+        if isSelected {
+            backImageView.isHidden = true
+            frontImageView.isHidden = false
+        } else {
+            backImageView.isHidden = false
+            frontImageView.isHidden = true
         }
     }
 
@@ -430,8 +459,8 @@ final class SelectCardViewController: BaseViewController {
     override func setupLayout() {
         super.setupLayout()
         inputTextField.snp.makeConstraints { make in
-            make.top.equalTo(view.safeAreaLayoutGuide).offset(20)
             make.horizontalEdges.equalToSuperview().inset(20)
+            make.bottom.equalTo(view.keyboardLayoutGuide.snp.top).inset(16)
             make.height.equalTo(50)
         }
 
@@ -515,7 +544,8 @@ extension SelectCardViewController: UICollectionViewDataSource, UICollectionView
         tarotCards.count
     }
 
-    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+    func collectionView(_ collectionView: UICollectionView,
+                        cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         guard let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: CardCollectionViewCell.identifier, for: indexPath) as? CardCollectionViewCell
         else { return UICollectionViewCell() }
@@ -585,7 +615,6 @@ struct TarotCard: Hashable, Identifiable {
         return "tarot_\(id).jpg"
     }
 }
-
 struct TarotData {
     static let allCards: [TarotCard] = {
         var cards: [TarotCard] = []
