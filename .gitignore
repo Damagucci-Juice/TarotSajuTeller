@@ -132,5 +132,6 @@ xcuserdata
 # End of https://www.toptal.com/developers/gitignore/api/xcode,fastlane,swiftpackagemanager,swiftpm,swift
 
 Secrets.xcconfig
-MonthChange.swift
+MonthChange.json
+
 
