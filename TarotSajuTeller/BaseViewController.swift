@@ -929,31 +929,41 @@ struct SajuResult {
     let day: String
     let hour: String
 }
+
 final class SajuManager {
     static let shared = SajuManager()
     private init() {}
 
-    // API 요청을 보내기 전, '자시'와 '서울 시간'을 고려해 실제 사주상의 날짜를 반환
     func getAdjustedDate(date: Date, time: Date) -> Date {
         let calendar = Calendar.current
-        var components = calendar.dateComponents([.year, .month, .day], from: date)
+
+        // 1. 선택한 날짜(date)에서 년/월/일 추출
+        let dateComp = calendar.dateComponents([.year, .month, .day], from: date)
+        // 2. 선택한 시간(time)에서 시/분 추출
         let timeComp = calendar.dateComponents([.hour, .minute], from: time)
 
-        components.hour = timeComp.hour
-        components.minute = timeComp.minute
+        // 3. 두 컴포넌트 병합 (원본 입력 시간: 예 23:30)
+        var combinedComp = DateComponents()
+        combinedComp.year = dateComp.year
+        combinedComp.month = dateComp.month
+        combinedComp.day = dateComp.day
+        combinedComp.hour = timeComp.hour
+        combinedComp.minute = timeComp.minute
 
-        guard var targetDate = calendar.date(from: components) else { return date }
+        guard let combinedDate = calendar.date(from: combinedComp) else { return date }
 
-        // 1. 서울 시간 보정 (-30분)
-        targetDate = targetDate.addingTimeInterval(-30 * 60)
+        // 4. 서울 시간 보정 (-30분)
+        // 23:30 -> 23:00 (여전히 당일 자시)
+        let seoulTimeDate = combinedDate.addingTimeInterval(-30 * 60)
 
-        // 2. 자시 처리: 밤 11시(23시) 이후면 다음 날로 간주
-        let hour = calendar.component(.hour, from: targetDate)
-        if hour >= 23 {
-            targetDate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate
+        // 5. 자시 처리: 보정 후 시간이 23시~익일 01시 사이라면 다음 날로 간주
+        // 사주 명리학 기준: 밤 23시부터는 다음 날의 일진(日辰)을 사용함
+        let adjustedHour = calendar.component(.hour, from: seoulTimeDate)
+        if adjustedHour >= 23 {
+            return calendar.date(byAdding: .day, value: 1, to: seoulTimeDate) ?? seoulTimeDate
         }
 
-        return targetDate
+        return seoulTimeDate
     }
 }
 
@@ -1075,49 +1085,42 @@ final class ProfileViewController: BaseViewController {
         view.addGestureRecognizer(tap)
     }
 
-    private func configureUIWithSavedData() {
-        // 1. 이름 불러오기
-        if let savedName = UserDefaults.standard.string(forKey: UDKey.name) {
-            nameTextField.text = savedName
-        }
-
-        // 2. 성별 불러오기 (기본값 0: 남성)
-        let savedGenderIndex = UserDefaults.standard.integer(forKey: UDKey.gender)
-        genderSegment.selectedSegmentIndex = savedGenderIndex
-
-        // 3. 생년월일 및 시간 불러오기
-        if let savedDate = UserDefaults.standard.object(forKey: UDKey.birthDate) as? Date {
-            // DatePicker들에 날짜 세팅
-            datePicker.date = savedDate
-            timePicker.date = savedDate
-        }
-    }
-
     @objc private func viewTapped() {
         view.endEditing(true)
     }
 
     @objc private func saveButtonTapped() {
-        guard let name = nameTextField.text, !name.isEmpty else {
-            view.makeToast("이름을 입력해주세요.")
-            return
-        }
+        guard let name = nameTextField.text, !name.isEmpty else { return }
 
-        // 1. SajuManager로 보정된 날짜 계산 (자시 및 서울 시간 반영)
-        // 보정 전 순수 입력값을 저장해야 다음에 들어왔을 때 Picker가 올바른 위치를 가리킵니다.
+        // 사용자가 피커에서 선택한 '진짜 원본' 값
         let inputDate = datePicker.date
         let inputTime = timePicker.date
 
-        // 실제 사주 계산용 보정 날짜
-        let adjustedDate = SajuManager.shared.getAdjustedDate(date: inputDate, time: inputTime)
-
-        // 2. 기본 정보 저장 (수정: 보정 전 날짜를 저장해야 나중에 UI를 다시 그릴 때 정확합니다)
+        // 1. UI 복원용 데이터 저장 (보정 전)
         UserDefaults.standard.set(name, forKey: UDKey.name)
         UserDefaults.standard.set(genderSegment.selectedSegmentIndex, forKey: UDKey.gender)
         UserDefaults.standard.set(inputDate, forKey: UDKey.birthDate)
+        UserDefaults.standard.set(inputTime, forKey: "user_birth_time") // 시간 데이터 별도 보존
 
-        // 3. 보정된 날짜로 API 호출
+        // 2. 사주 계산용 보정 (로직 내부에서만 사용)
+        let adjustedDate = SajuManager.shared.getAdjustedDate(date: inputDate, time: inputTime)
+
+        // 3. 보정된 날짜(익일 자시 반영)로 API 호출
         fetchSolar(date: adjustedDate)
+    }
+
+    private func configureUIWithSavedData() {
+        nameTextField.text = UserDefaults.standard.string(forKey: UDKey.name)
+        genderSegment.selectedSegmentIndex = UserDefaults.standard.integer(forKey: UDKey.gender)
+
+        if let savedDate = UserDefaults.standard.object(forKey: UDKey.birthDate) as? Date {
+            datePicker.date = savedDate
+
+            // 저장된 원본 시간으로 복원 (오후 11시 30분이 정확히 표시됨)
+            if let savedTime = UserDefaults.standard.object(forKey: "user_birth_time") as? Date {
+                timePicker.date = savedTime
+            }
+        }
     }
 
     private func fetchSolar(date: Date) {
