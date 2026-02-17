@@ -362,8 +362,8 @@ final class CardCollectionViewCell: UICollectionViewCell {
             to: frontImageView,
             duration: 0.6,
             options: transitionOptions) { [weak self] _ in
-            self?.isFlipped = true
-        }
+                self?.isFlipped = true
+            }
     }
     // Cell의 configure 메서드
     func configure(with card: TarotCard, isSelected: Bool) {
@@ -439,7 +439,7 @@ final class SelectCardViewController: BaseViewController {
     }
 
     private var sowan: String?
-    private var selectedCards: Set<TarotCard> = []
+    private var selectedCards: [TarotCard] = []
     private let tarotCards = TarotData.allCards.shuffled()
 
     // 화면이 나타날 때 포커싱 (키보드 올리기)
@@ -570,14 +570,17 @@ extension SelectCardViewController: UICollectionViewDataSource, UICollectionView
         guard let cell = collectionView.cellForItem(at: indexPath) as? CardCollectionViewCell else { return }
 
         // 1. 상태 업데이트 및 애니메이션 실행
-        selectedCards.insert(card)
+        selectedCards.append(card)
         cell.flipCard()
 
         print("\(indexPath.item + 1)번째 카드가 선택되었습니다.")
 
         if selectedCards.count == 3 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
                 print("3개 선택 완료!")
+                guard let self else { return }
+                let vc = TarotResultViewController(cards: self.selectedCards, hope: sowan ?? "")
+                self.navigationController?.pushViewController(vc, animated: true)
             }
         }
     }
@@ -648,4 +651,278 @@ struct TarotData {
     }()
 
     private init() { }
+}
+
+// MARK: - Tarot Result View Controller
+
+final class TarotResultViewController: BaseViewController {
+
+    private let cards: [TarotCard]
+    private let hope: String
+
+    // AI 앱 이동 버튼들을 담을 스택뷰
+    private let aiButtonStackView = UIStackView().then {
+        $0.axis = .horizontal
+        $0.spacing = 15
+        $0.distribution = .fillEqually
+    }
+
+    // 고민 텍스트 레이블
+    private let hopeLabel = UILabel().then {
+        $0.font = .systemFont(ofSize: 18, weight: .semibold)
+        $0.textColor = .white
+        $0.textAlignment = .center
+        $0.numberOfLines = 0
+    }
+
+    // 카드 리스트를 보여줄 컬렉션 뷰
+    private lazy var collectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout().then {
+            $0.scrollDirection = .horizontal // 일렬로 배치하기 위해 가로 스크롤 설정
+            $0.minimumLineSpacing = 20
+            $0.itemSize = CGSize(width: 150, height: 260) // 타로 카드 비율 고려
+        }
+
+        return UICollectionView(frame: .zero, collectionViewLayout: layout).then {
+            $0.backgroundColor = .clear
+            $0.showsHorizontalScrollIndicator = false
+            $0.register(CardCollectionViewCell.self, forCellWithReuseIdentifier: CardCollectionViewCell.identifier)
+            $0.delegate = self
+            $0.dataSource = self
+            // 카드들이 중앙에 오도록 여백 설정
+            $0.contentInset = UIEdgeInsets(top: 0, left: 40, bottom: 0, right: 40)
+        }
+    }()
+
+    init(cards: [TarotCard], hope: String) {
+        self.cards = cards
+        self.hope = hope
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .black
+        setupHierarchy()
+        setupLayout()
+        configureData()
+        setupNavigationBar() // 네비게이션 설정 추가
+    }
+
+    private func setupNavigationBar() {
+        // 1. 왼쪽 백버튼 숨기기 및 'X' 버튼 추가
+        self.navigationItem.hidesBackButton = true
+        let closeButton = UIBarButtonItem(
+            image: UIImage(systemName: "xmark"),
+            style: .plain,
+            target: self,
+            action: #selector(closeButtonTapped)
+        )
+        closeButton.tintColor = .white
+        self.navigationItem.leftBarButtonItem = closeButton
+
+        // 2. 오른쪽 복사 버튼 추가
+        let copyButton = UIBarButtonItem(
+            image: UIImage(systemName: "doc.on.doc"),
+            style: .plain,
+            target: self,
+            action: #selector(copyButtonTapped)
+        )
+        copyButton.tintColor = .white
+        self.navigationItem.rightBarButtonItem = copyButton
+    }
+
+    override func setupHierarchy() {
+        super.setupHierarchy()
+        view.addSubview(hopeLabel)
+        view.addSubview(collectionView)
+        view.addSubview(aiButtonStackView)
+    }
+
+    override func setupLayout() {
+        super.setupLayout()
+
+        hopeLabel.snp.makeConstraints {
+            $0.top.equalTo(view.safeAreaLayoutGuide).offset(40)
+            $0.leading.trailing.equalToSuperview().inset(20)
+        }
+
+        collectionView.snp.makeConstraints {
+            $0.top.equalTo(hopeLabel.snp.bottom).offset(50)
+            $0.leading.trailing.equalToSuperview()
+            $0.height.equalTo(300)
+        }
+
+        // AI 버튼 스택뷰 레이아웃
+        aiButtonStackView.snp.makeConstraints {
+            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-30)
+            $0.leading.trailing.equalToSuperview().inset(30)
+            $0.height.equalTo(50)
+        }
+    }
+
+    override func setupView() {
+        super.setupView()
+        setupAIButtons()
+    }
+
+    private func setupAIButtons() {
+        let aiApps = [
+            (name: "ChatGPT", scheme: "chatgpt://", color: UIColor(red: 0.44, green: 0.65, blue: 0.58, alpha: 1.0)),
+            (name: "Gemini", scheme: "googlegemini://", color: .systemBlue),
+            (name: "Claude", scheme: "claude://", color: UIColor(red: 0.82, green: 0.45, blue: 0.33, alpha: 1.0))
+        ]
+
+        aiApps.forEach { app in
+            let button = UIButton().then {
+                $0.setTitle(app.name, for: .normal)
+                $0.backgroundColor = app.color
+                $0.layer.cornerRadius = 10
+                $0.titleLabel?.font = .systemFont(ofSize: 14, weight: .bold)
+                $0.tag = aiApps.firstIndex(where: { $0.name == app.name }) ?? 0
+            }
+            button.addTarget(self, action: #selector(aiButtonTapped(_:)), for: .touchUpInside)
+            aiButtonStackView.addArrangedSubview(button)
+        }
+    }
+
+    /// 복사할 텍스트를 생성하고 클립보드에 저장하는 공통 로직
+        private func copyTarotResultToPasteboard() {
+            let spreadPositions = ["과거", "현재", "미래"]
+
+            let cardInfoList = cards.enumerated().map { (index, card) in
+                let position = index < spreadPositions.count ? spreadPositions[index] : "카드 \(index + 1)"
+                let direction = card.isReversed ? "(역방향)" : "(정방향)"
+                return "• [\(position)] \(card.name) \(direction)"
+            }.joined(separator: "\n")
+
+            let copyText = """
+            "\(hope)"라는 질문으로 점을 보려고 3 카드 스프레드를 사용해서 타로카드를 뽑았다.
+            뽑은 카드는
+            \(cardInfoList) 이다.
+            이 카드를 어떻게 해석해야 할까? 사주와 함께 분석해줘.
+            """
+
+            UIPasteboard.general.string = copyText
+
+            // 햅틱 피드백으로 복사됨을 알림
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+        }
+
+    @objc private func aiButtonTapped(_ sender: UIButton) {
+        copyTarotResultToPasteboard()
+
+        let schemes = ["chatgpt://", "googlegemini://", "claude://"]
+        let selectedScheme = schemes[sender.tag]
+
+        if let url = URL(string: selectedScheme), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        } else {
+            // 앱이 설치되어 있지 않을 경우 알림
+            let alert = UIAlertController(title: "알림", message: "\(sender.currentTitle ?? "해당") 앱이 설치되어 있지 않습니다.", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "확인", style: .default))
+            self.present(alert, animated: true)
+        }
+    }
+    @objc private func closeButtonTapped() {
+        // 앱의 첫 화면(RootViewController)으로 이동
+        self.navigationController?.popToRootViewController(animated: true)
+    }
+
+    @objc private func copyButtonTapped() {
+        let spreadPositions = ["과거", "현재", "미래"]
+
+        let cardInfoList = cards.enumerated().map { (index, card) in
+            let position = index < spreadPositions.count ? spreadPositions[index] : "카드 \(index + 1)"
+            let direction = card.isReversed ? "(역방향)" : "(정방향)"
+            return "• [\(position)] \(card.name) \(direction)"
+        }.joined(separator: "\n")
+
+        let copyText = """
+        "\(hope)"라는 질문으로 점을 보려고 3 카드 스프레드를 사용해서 타로카드를 뽑았다. 
+        뽑은 카드는 
+        \(cardInfoList) 이다. 
+        이 카드를 어떻게 해석해야 할까? 사주와 함께 분석해줘.
+        """
+
+        UIPasteboard.general.string = copyText
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+
+        let alert = UIAlertController(
+            title: copyText,
+            message: nil,
+            preferredStyle: .alert
+        )
+
+        alert.addAction(UIAlertAction(title: "글 복사하기", style: .default))
+        self.present(alert, animated: true)
+    }
+
+    private func configureData() {
+        hopeLabel.text = "“\(hope)”"
+    }
+}
+
+extension TarotResultViewController: UICollectionViewDelegate, UICollectionViewDataSource {
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return cards.count
+    }
+
+    func collectionView(
+        _ collectionView: UICollectionView,
+        cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+            guard let cell = collectionView.dequeueReusableCell(
+                withReuseIdentifier: CardCollectionViewCell.identifier, for: indexPath)
+                    as? CardCollectionViewCell else { return UICollectionViewCell() }
+
+            let card = cards[indexPath.item]
+            // 결과 화면이므로 뒤집힌 상태(isSelected: true)로 구성
+            cell.configure(with: card, isSelected: true)
+
+            return cell
+        }
+}
+
+// MARK: - Saju
+
+struct SajuResult {
+    let year: String
+    let month: String
+    let day: String
+    let hour: String
+}
+
+final class SajuManager {
+    static let shared = SajuManager()
+    private init() { }
+    
+    func calculateSaju(date: Date, time: Date) -> SajuResult {
+        let calendar = Calendar.current
+        var calendarComponents = calendar.dateComponents([.year, .month, .day], from: date)
+        let timeComponents = calendar.dateComponents([.hour, .minute], from: time)
+
+        calendarComponents.hour = timeComponents.hour
+        calendarComponents.minute = timeComponents.minute
+
+        guard var targetDate = calendar.date(from: calendarComponents) else {
+            return SajuResult(year: "", month: "", day: "", hour: "")
+        }
+
+        // 1. 서울 시간 보정 (-30분 적용)
+        targetDate = targetDate.addingTimeInterval(-30 * 60)
+
+        // 2. 자시(23시~01시) 처리: 밤 11시가 넘으면 다음 날로 간주
+        let adjustedHour = calendar.component(.hour, from: targetDate)
+        if adjustedHour >= 23 {
+            targetDate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate
+        }
+
+        // TODO: 만세력 라이브러리 또는 API 연동하여 간지 추출
+        // 여기서는 구조 예시만 리턴합니다.
+        return SajuResult(year: "갑진", month: "병인", day: "병인", hour: "무자")
+    }
 }
