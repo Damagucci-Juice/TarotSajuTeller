@@ -237,7 +237,9 @@ struct LunaItem: Decodable, CustomStringConvertible {
     }
 }
 
-enum TaroRouter: URLRequestConvertible {
+// MARK: - TAROT Router
+
+enum TarotRouter: URLRequestConvertible {
     case solarToLuna(requestDto: SolarRequestDTO)
 
     var baseURL: String {
@@ -281,11 +283,13 @@ enum SolarError: Error {
     case unknown
 }
 
+// MARK: - Network Service
+
 final class NetworkService {
     static let shared = NetworkService()
     private init() { }
 
-    func fetch<T>(_ api: TaroRouter,
+    func fetch<T>(_ api: TarotRouter,
                   type: T.Type,
                   completion: @escaping (Result<T, SolarError>) -> Void) where T: Decodable {
         do {
@@ -964,9 +968,9 @@ enum UDKey {
     static let sajuHour = "saju_hour"
 }
 
-final class ProfileViewController: BaseViewController {
+// MARK: - ProfileViewController
 
-    // UserDefaults 저장용 키
+final class ProfileViewController: BaseViewController {
 
     private let titleLabel = UILabel().then {
         $0.text = "사주 정보를 입력해주세요"
@@ -974,30 +978,34 @@ final class ProfileViewController: BaseViewController {
         $0.textColor = .white
     }
 
-    private let nameTextField = UITextField().then {
+    private lazy var nameTextField = UITextField().then {
         $0.placeholder = "이름"
         $0.backgroundColor = .darkGray
         $0.textColor = .white
         $0.layer.cornerRadius = 8
         $0.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 10, height: 0))
         $0.leftViewMode = .always
+        $0.addTarget(self, action: #selector(viewTapped), for: .editingDidEndOnExit)
     }
 
-    private let genderSegment = UISegmentedControl(items: ["남성", "여성"]).then {
+    private lazy var genderSegment = UISegmentedControl(items: ["남성", "여성"]).then {
         $0.selectedSegmentIndex = 0
         $0.selectedSegmentTintColor = .systemPurple
+        $0.addTarget(self, action: #selector(viewTapped), for: .valueChanged)
     }
 
-    private let datePicker = UIDatePicker().then {
+    private lazy var datePicker = UIDatePicker().then {
         $0.datePickerMode = .date
         $0.preferredDatePickerStyle = .wheels
         $0.locale = Locale(identifier: "ko_KR")
+        $0.addTarget(self, action: #selector(viewTapped), for: .valueChanged)
     }
 
-    private let timePicker = UIDatePicker().then {
+    private lazy var timePicker = UIDatePicker().then {
         $0.datePickerMode = .time
         $0.preferredDatePickerStyle = .wheels
         $0.locale = Locale(identifier: "ko_KR")
+        $0.addTarget(self, action: #selector(viewTapped), for: .valueChanged)
     }
 
     private lazy var saveButton = UIButton().then {
@@ -1011,6 +1019,12 @@ final class ProfileViewController: BaseViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .orange
+        configureUIWithSavedData() // 💡 저장된 데이터로 UI 채우기
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        nameTextField.becomeFirstResponder()
     }
 
     override func setupHierarchy() {
@@ -1061,22 +1075,48 @@ final class ProfileViewController: BaseViewController {
         view.addGestureRecognizer(tap)
     }
 
+    private func configureUIWithSavedData() {
+        // 1. 이름 불러오기
+        if let savedName = UserDefaults.standard.string(forKey: UDKey.name) {
+            nameTextField.text = savedName
+        }
+
+        // 2. 성별 불러오기 (기본값 0: 남성)
+        let savedGenderIndex = UserDefaults.standard.integer(forKey: UDKey.gender)
+        genderSegment.selectedSegmentIndex = savedGenderIndex
+
+        // 3. 생년월일 및 시간 불러오기
+        if let savedDate = UserDefaults.standard.object(forKey: UDKey.birthDate) as? Date {
+            // DatePicker들에 날짜 세팅
+            datePicker.date = savedDate
+            timePicker.date = savedDate
+        }
+    }
+
     @objc private func viewTapped() {
         view.endEditing(true)
     }
 
     @objc private func saveButtonTapped() {
-        guard let name = nameTextField.text, !name.isEmpty else { return }
+        guard let name = nameTextField.text, !name.isEmpty else {
+            view.makeToast("이름을 입력해주세요.")
+            return
+        }
 
         // 1. SajuManager로 보정된 날짜 계산 (자시 및 서울 시간 반영)
-        let adjustedDate = SajuManager.shared.getAdjustedDate(date: datePicker.date, time: timePicker.date)
+        // 보정 전 순수 입력값을 저장해야 다음에 들어왔을 때 Picker가 올바른 위치를 가리킵니다.
+        let inputDate = datePicker.date
+        let inputTime = timePicker.date
 
-        // 2. 기본 정보 저장
+        // 실제 사주 계산용 보정 날짜
+        let adjustedDate = SajuManager.shared.getAdjustedDate(date: inputDate, time: inputTime)
+
+        // 2. 기본 정보 저장 (수정: 보정 전 날짜를 저장해야 나중에 UI를 다시 그릴 때 정확합니다)
         UserDefaults.standard.set(name, forKey: UDKey.name)
         UserDefaults.standard.set(genderSegment.selectedSegmentIndex, forKey: UDKey.gender)
-        UserDefaults.standard.set(adjustedDate, forKey: UDKey.birthDate)
+        UserDefaults.standard.set(inputDate, forKey: UDKey.birthDate)
 
-        // 3. 보정된 날짜로 API 호출 (실제 간지 데이터를 가져오기 위함)
+        // 3. 보정된 날짜로 API 호출
         fetchSolar(date: adjustedDate)
     }
 
@@ -1088,27 +1128,29 @@ final class ProfileViewController: BaseViewController {
 
         let dto = SolarRequestDTO(solarDay: day, solarMonth: month, solarYear: year)
 
-        NetworkService.shared.fetch(.solarToLuna(requestDto: dto), type: SolarToLunaResponse.self) { [weak self] result in
-            switch result {
-            case .success(let answer):
-                let item = answer.response.body.items.item
+        NetworkService.shared.fetch(
+            .solarToLuna(requestDto: dto),
+            type: SolarToLunaResponse.self) { [weak self] result in
+                switch result {
+                case .success(let answer):
+                    let item = answer.response.body.items.item
 
-                // 💡 4. API에서 받은 실제 값을 UserDefaults에 저장 (더 이상 고정값 아님)
-                UserDefaults.standard.set(item.lunSecha, forKey: UDKey.sajuYear)   // 년주
-                UserDefaults.standard.set(item.lunWolgeon, forKey: UDKey.sajuMonth) // 월주
-                UserDefaults.standard.set(item.lunIljin, forKey: UDKey.sajuDay)     // 일주
+                    // 💡 4. API에서 받은 실제 값을 UserDefaults에 저장 (더 이상 고정값 아님)
+                    UserDefaults.standard.set(item.lunSecha, forKey: UDKey.sajuYear)   // 년주
+                    UserDefaults.standard.set(item.lunWolgeon, forKey: UDKey.sajuMonth) // 월주
+                    UserDefaults.standard.set(item.lunIljin, forKey: UDKey.sajuDay)     // 일주
 
-                // 시주는 로컬 로직으로 계산하거나 별도 처리
-                UserDefaults.standard.set("시간 데이터", forKey: UDKey.sajuHour)
+                    // 시주는 로컬 로직으로 계산하거나 별도 처리
+                    UserDefaults.standard.set("시간 데이터", forKey: UDKey.sajuHour)
 
-                NotificationCenter.default.post(name: NSNotification.Name("BirthDateChanged"), object: nil)
+                    NotificationCenter.default.post(name: NSNotification.Name("BirthDateChanged"), object: nil)
 
-                DispatchQueue.main.async {
-                    self?.navigationController?.popViewController(animated: true)
+                    DispatchQueue.main.async {
+                        self?.navigationController?.popViewController(animated: true)
+                    }
+                case .failure:
+                    self?.view.makeToast("사주 정보를 가져오지 못했습니다.")
                 }
-            case .failure:
-                self?.view.makeToast("사주 정보를 가져오지 못했습니다.")
             }
-        }
     }
 }
