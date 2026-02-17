@@ -55,36 +55,43 @@ class BaseViewController: UIViewController, BasicViewProtocol {
 }
 
 // MARK: - MAIN VIEW CONTROLLER
-
+// MARK: - MAIN VIEW CONTROLLER
 final class MainViewController: BaseViewController {
 
     private let resultLabel = UILabel().then { lbl in
         lbl.textColor = .black
         lbl.numberOfLines = 0
-        lbl.text = "생일을 입력하세요"
+        lbl.textAlignment = .center
+        lbl.font = .systemFont(ofSize: 16, weight: .medium)
+        lbl.text = "프로필을 입력해주세요"
     }
 
     private let callButton = UIButton().then { btn in
         btn.setTitle("3카드 뽑기", for: .normal)
         btn.setTitleColor(.black, for: .normal)
+        btn.backgroundColor = .yellow
+        btn.layer.cornerRadius = 100
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        fetchSolar()
+        // 💡 프로필 변경 감지 등록
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleBirthDateChanged),
+            name: NSNotification.Name("BirthDateChanged"), object: nil)
+        fetchSolarIfNeeded()
     }
 
     override func setupHierarchy() {
-        super.setupHierarchy()
         view.addSubview(resultLabel)
         view.addSubview(callButton)
     }
 
     override func setupLayout() {
-        super.setupLayout()
         resultLabel.snp.makeConstraints { make in
-            make.top.horizontalEdges.equalToSuperview().inset(16)
-            make.bottom.equalTo(callButton.snp.top).inset(16)
+            make.top.equalTo(view.safeAreaLayoutGuide).offset(50)
+            make.horizontalEdges.equalToSuperview().inset(20)
         }
 
         callButton.snp.makeConstraints { make in
@@ -97,31 +104,54 @@ final class MainViewController: BaseViewController {
         super.setupView()
         navigationItem.title = "Saju"
 
-        callButton.backgroundColor = .yellow
+        let profileButton = UIBarButtonItem(
+            image: UIImage(systemName: "person.circle"),
+            style: .plain,
+            target: self,
+            action: #selector(profileButtonTapped)
+        )
+        profileButton.tintColor = .black
+        navigationItem.rightBarButtonItem = profileButton
+
         callButton.addTarget(self, action: #selector(callButtonAction), for: .touchUpInside)
     }
 
-    @objc
-    private func callButtonAction() {
-        print(#function)
-        // 생일 정보 있으면 쓰고 아니면 바로 타로 카드
-        fetchSolar()
-        let selectVC = SelectCardViewController()
-        navigationController?.pushViewController(selectVC, animated: true)
+    @objc private func handleBirthDateChanged() {
+        fetchSolarIfNeeded() // 알림 받으면 갱신
     }
 
-    private func fetchSolar() {
-        let solarRequestDto = SolarRequestDTO(solarDay: 3, solarMonth: 8, solarYear: 1995)
-        NetworkService.shared.fetch(
-            .solarToLuna(requestDto: solarRequestDto),
-            type: SolarToLunaResponse.self) { result in
-                switch result {
-                case .success(let answer):
-                    self.resultLabel.text = answer.response.body.items.item.description
-                case .failure(let error):
-                    self.view.makeToast(error.localizedDescription)
-                }
-            }
+    private func fetchSolarIfNeeded() {
+        // API 통신 후 저장된 실제 일주(sajuDay) 정보를 가져옴
+        if let realIljin = UserDefaults.standard.string(forKey: UDKey.sajuDay),
+           let name = UserDefaults.standard.string(forKey: UDKey.name) {
+            // 예: "Gucci님은 현재 [병인(丙寅)] 일주의 기운이 흐르고 있습니다."
+            self.resultLabel.text = "“\(name)”님은 현재 [\(realIljin)] 일주의 기운이 흐르고 있습니다."
+        } else {
+            showProfileRequiredAlert()
+        }
+    }
+
+    private func showProfileRequiredAlert() {
+        let alert = UIAlertController(title: "프로필 미설정", message: "사주 분석을 위해 프로필을 완성해주세요.", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "설정하러 가기", style: .default) { [weak self] _ in
+            self?.profileButtonTapped()
+        })
+        alert.addAction(UIAlertAction(title: "취소", style: .cancel))
+        present(alert, animated: true)
+    }
+
+    @objc private func profileButtonTapped() {
+        let profileVC = ProfileViewController()
+        navigationController?.pushViewController(profileVC, animated: true)
+    }
+
+    @objc private func callButtonAction() {
+        if UserDefaults.standard.string(forKey: UDKey.sajuDay) == nil {
+            showProfileRequiredAlert()
+        } else {
+            let selectVC = SelectCardViewController()
+            navigationController?.pushViewController(selectVC, animated: true)
+        }
     }
 }
 
@@ -789,28 +819,28 @@ final class TarotResultViewController: BaseViewController {
     }
 
     /// 복사할 텍스트를 생성하고 클립보드에 저장하는 공통 로직
-        private func copyTarotResultToPasteboard() {
-            let spreadPositions = ["과거", "현재", "미래"]
+    private func copyTarotResultToPasteboard() {
+        let spreadPositions = ["과거", "현재", "미래"]
 
-            let cardInfoList = cards.enumerated().map { (index, card) in
-                let position = index < spreadPositions.count ? spreadPositions[index] : "카드 \(index + 1)"
-                let direction = card.isReversed ? "(역방향)" : "(정방향)"
-                return "• [\(position)] \(card.name) \(direction)"
-            }.joined(separator: "\n")
+        let cardInfoList = cards.enumerated().map { (index, card) in
+            let position = index < spreadPositions.count ? spreadPositions[index] : "카드 \(index + 1)"
+            let direction = card.isReversed ? "(역방향)" : "(정방향)"
+            return "• [\(position)] \(card.name) \(direction)"
+        }.joined(separator: "\n")
 
-            let copyText = """
+        let copyText = """
             "\(hope)"라는 질문으로 점을 보려고 3 카드 스프레드를 사용해서 타로카드를 뽑았다.
             뽑은 카드는
             \(cardInfoList) 이다.
             이 카드를 어떻게 해석해야 할까? 사주와 함께 분석해줘.
             """
 
-            UIPasteboard.general.string = copyText
+        UIPasteboard.general.string = copyText
 
-            // 햅틱 피드백으로 복사됨을 알림
-            let generator = UINotificationFeedbackGenerator()
-            generator.notificationOccurred(.success)
-        }
+        // 햅틱 피드백으로 복사됨을 알림
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
+    }
 
     @objc private func aiButtonTapped(_ sender: UIButton) {
         copyTarotResultToPasteboard()
@@ -895,34 +925,190 @@ struct SajuResult {
     let day: String
     let hour: String
 }
-
 final class SajuManager {
     static let shared = SajuManager()
-    private init() { }
-    
-    func calculateSaju(date: Date, time: Date) -> SajuResult {
+    private init() {}
+
+    // API 요청을 보내기 전, '자시'와 '서울 시간'을 고려해 실제 사주상의 날짜를 반환
+    func getAdjustedDate(date: Date, time: Date) -> Date {
         let calendar = Calendar.current
-        var calendarComponents = calendar.dateComponents([.year, .month, .day], from: date)
-        let timeComponents = calendar.dateComponents([.hour, .minute], from: time)
+        var components = calendar.dateComponents([.year, .month, .day], from: date)
+        let timeComp = calendar.dateComponents([.hour, .minute], from: time)
 
-        calendarComponents.hour = timeComponents.hour
-        calendarComponents.minute = timeComponents.minute
+        components.hour = timeComp.hour
+        components.minute = timeComp.minute
 
-        guard var targetDate = calendar.date(from: calendarComponents) else {
-            return SajuResult(year: "", month: "", day: "", hour: "")
-        }
+        guard var targetDate = calendar.date(from: components) else { return date }
 
-        // 1. 서울 시간 보정 (-30분 적용)
+        // 1. 서울 시간 보정 (-30분)
         targetDate = targetDate.addingTimeInterval(-30 * 60)
 
-        // 2. 자시(23시~01시) 처리: 밤 11시가 넘으면 다음 날로 간주
-        let adjustedHour = calendar.component(.hour, from: targetDate)
-        if adjustedHour >= 23 {
+        // 2. 자시 처리: 밤 11시(23시) 이후면 다음 날로 간주
+        let hour = calendar.component(.hour, from: targetDate)
+        if hour >= 23 {
             targetDate = calendar.date(byAdding: .day, value: 1, to: targetDate) ?? targetDate
         }
 
-        // TODO: 만세력 라이브러리 또는 API 연동하여 간지 추출
-        // 여기서는 구조 예시만 리턴합니다.
-        return SajuResult(year: "갑진", month: "병인", day: "병인", hour: "무자")
+        return targetDate
+    }
+}
+
+enum UDKey {
+    static let name = "user_name"
+    static let gender = "user_gender"
+    static let birthDate = "user_birth_date" // 날짜와 시간이 포함된 Date 객체
+    // 계산된 사주 결과 저장용
+    static let sajuYear = "saju_year"
+    static let sajuMonth = "saju_month"
+    static let sajuDay = "saju_day"
+    static let sajuHour = "saju_hour"
+}
+
+final class ProfileViewController: BaseViewController {
+
+    // UserDefaults 저장용 키
+
+    private let titleLabel = UILabel().then {
+        $0.text = "사주 정보를 입력해주세요"
+        $0.font = .systemFont(ofSize: 22, weight: .bold)
+        $0.textColor = .white
+    }
+
+    private let nameTextField = UITextField().then {
+        $0.placeholder = "이름"
+        $0.backgroundColor = .darkGray
+        $0.textColor = .white
+        $0.layer.cornerRadius = 8
+        $0.leftView = UIView(frame: CGRect(x: 0, y: 0, width: 10, height: 0))
+        $0.leftViewMode = .always
+    }
+
+    private let genderSegment = UISegmentedControl(items: ["남성", "여성"]).then {
+        $0.selectedSegmentIndex = 0
+        $0.selectedSegmentTintColor = .systemPurple
+    }
+
+    private let datePicker = UIDatePicker().then {
+        $0.datePickerMode = .date
+        $0.preferredDatePickerStyle = .wheels
+        $0.locale = Locale(identifier: "ko_KR")
+    }
+
+    private let timePicker = UIDatePicker().then {
+        $0.datePickerMode = .time
+        $0.preferredDatePickerStyle = .wheels
+        $0.locale = Locale(identifier: "ko_KR")
+    }
+
+    private lazy var saveButton = UIButton().then {
+        $0.setTitle("정보 저장하기", for: .normal)
+        $0.backgroundColor = .systemPurple
+        $0.layer.cornerRadius = 12
+        $0.titleLabel?.font = .systemFont(ofSize: 18, weight: .bold)
+        $0.addTarget(self, action: #selector(saveButtonTapped), for: .touchUpInside)
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .orange
+    }
+
+    override func setupHierarchy() {
+        [titleLabel, nameTextField, genderSegment, datePicker, timePicker, saveButton].forEach {
+            view.addSubview($0)
+        }
+    }
+
+    override func setupLayout() {
+        titleLabel.snp.makeConstraints {
+            $0.top.equalTo(view.safeAreaLayoutGuide).offset(30)
+            $0.centerX.equalToSuperview()
+        }
+
+        nameTextField.snp.makeConstraints {
+            $0.top.equalTo(titleLabel.snp.bottom).offset(30)
+            $0.leading.trailing.equalToSuperview().inset(20)
+            $0.height.equalTo(50)
+        }
+
+        genderSegment.snp.makeConstraints {
+            $0.top.equalTo(nameTextField.snp.bottom).offset(20)
+            $0.leading.trailing.equalToSuperview().inset(20)
+        }
+
+        datePicker.snp.makeConstraints {
+            $0.top.equalTo(genderSegment.snp.bottom).offset(20)
+            $0.leading.trailing.equalToSuperview().inset(20)
+            $0.height.equalTo(120)
+        }
+
+        timePicker.snp.makeConstraints {
+            $0.top.equalTo(datePicker.snp.bottom).offset(10)
+            $0.leading.trailing.equalToSuperview().inset(20)
+            $0.height.equalTo(120)
+        }
+
+        saveButton.snp.makeConstraints {
+            $0.bottom.equalTo(view.safeAreaLayoutGuide).offset(-30)
+            $0.leading.trailing.equalToSuperview().inset(20)
+            $0.height.equalTo(55)
+        }
+    }
+
+    override func setupView() {
+        super.setupView()
+        let tap = UITapGestureRecognizer(target: self, action: #selector(viewTapped))
+        view.addGestureRecognizer(tap)
+    }
+
+    @objc private func viewTapped() {
+        view.endEditing(true)
+    }
+
+    @objc private func saveButtonTapped() {
+        guard let name = nameTextField.text, !name.isEmpty else { return }
+
+        // 1. SajuManager로 보정된 날짜 계산 (자시 및 서울 시간 반영)
+        let adjustedDate = SajuManager.shared.getAdjustedDate(date: datePicker.date, time: timePicker.date)
+
+        // 2. 기본 정보 저장
+        UserDefaults.standard.set(name, forKey: UDKey.name)
+        UserDefaults.standard.set(genderSegment.selectedSegmentIndex, forKey: UDKey.gender)
+        UserDefaults.standard.set(adjustedDate, forKey: UDKey.birthDate)
+
+        // 3. 보정된 날짜로 API 호출 (실제 간지 데이터를 가져오기 위함)
+        fetchSolar(date: adjustedDate)
+    }
+
+    private func fetchSolar(date: Date) {
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: date)
+        let month = calendar.component(.month, from: date)
+        let day = calendar.component(.day, from: date)
+
+        let dto = SolarRequestDTO(solarDay: day, solarMonth: month, solarYear: year)
+
+        NetworkService.shared.fetch(.solarToLuna(requestDto: dto), type: SolarToLunaResponse.self) { [weak self] result in
+            switch result {
+            case .success(let answer):
+                let item = answer.response.body.items.item
+
+                // 💡 4. API에서 받은 실제 값을 UserDefaults에 저장 (더 이상 고정값 아님)
+                UserDefaults.standard.set(item.lunSecha, forKey: UDKey.sajuYear)   // 년주
+                UserDefaults.standard.set(item.lunWolgeon, forKey: UDKey.sajuMonth) // 월주
+                UserDefaults.standard.set(item.lunIljin, forKey: UDKey.sajuDay)     // 일주
+
+                // 시주는 로컬 로직으로 계산하거나 별도 처리
+                UserDefaults.standard.set("시간 데이터", forKey: UDKey.sajuHour)
+
+                NotificationCenter.default.post(name: NSNotification.Name("BirthDateChanged"), object: nil)
+
+                DispatchQueue.main.async {
+                    self?.navigationController?.popViewController(animated: true)
+                }
+            case .failure:
+                self?.view.makeToast("사주 정보를 가져오지 못했습니다.")
+            }
+        }
     }
 }
