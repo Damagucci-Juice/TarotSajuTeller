@@ -847,17 +847,14 @@ final class TarotResultViewController: BaseViewController {
     }
 
     @objc private func aiButtonTapped(_ sender: UIButton) {
-        // 1. 저장된 사주 데이터 불러오기
         let sYear = UserDefaults.standard.string(forKey: UDKey.sajuYear) ?? ""
-        let sMonth = UserDefaults.standard.string(forKey: UDKey.sajuMonth) ?? ""
         let sDay = UserDefaults.standard.string(forKey: UDKey.sajuDay) ?? ""
         let sHour = UserDefaults.standard.string(forKey: UDKey.sajuHour) ?? ""
 
-        // 사주 데이터 존재 여부 확인
         let hasSajuData = !sDay.isEmpty
-        let sajuText = hasSajuData ? "\n[나의 사주 정보]\n년주: \(sYear), 월주: \(sMonth), 일주: \(sDay), 시주: \(sHour)\n" : ""
+        // 💡 월주(sMonth) 삭제
+        let sajuText = hasSajuData ? "\n[나의 사주 정보]\n년주: \(sYear), 일주: \(sDay), 시주: \(sHour)\n" : ""
 
-        // 2. 타로 카드 리스트 생성
         let spreadPositions = ["과거", "현재", "미래"]
         let cardInfoList = cards.enumerated().map { (index, card) in
             let position = index < spreadPositions.count ? spreadPositions[index] : "카드 \(index + 1)"
@@ -865,18 +862,16 @@ final class TarotResultViewController: BaseViewController {
             return "• [\(position)] \(card.name) \(direction)"
         }.joined(separator: "\n")
 
-        // 3. 통합 질문 생성
-        // 사주 데이터가 있으면 결합 분석 요청을, 없으면 타로 중심 분석 요청을 포함합니다.
         let analysisRequest = hasSajuData ? "타로 카드와 사주 정보를 결합해서 설명해줘." : "이 타로 카드들을 상세히 분석해줘."
 
         let copyText = """
-        "\(hope)"라는 질문으로 점을 보려고 3 카드 스프레드를 사용해서 타로카드를 뽑았다.
-        
-        뽑은 카드는
-        \(cardInfoList) 이다.
-        \(sajuText)
-        \(analysisRequest)
-        """
+            "\(hope)"라는 질문으로 점을 보려고 3 카드 스프레드를 사용해서 타로카드를 뽑았다.
+            
+            뽑은 카드는
+            \(cardInfoList) 이다.
+            \(sajuText)
+            \(analysisRequest)
+            """
 
         // 4. 앱 정보 및 스킴 설정
         let aiApps = ["ChatGPT", "Gemini", "Claude"]
@@ -978,19 +973,15 @@ struct SajuResult {
     let day: String
     let hour: String
 }
+
 final class SajuManager {
     static let shared = SajuManager()
     private init() {}
 
-    // 💡 Key를 한글로 수정하여 API 결과값("병인")과 일치시킵니다.
     private let siduTable: [String: String] = [
         "갑": "갑", "기": "갑", "을": "병", "경": "병",
         "병": "무", "신": "무", "정": "경", "임": "경",
-        "무": "임", "계": "임",
-        // 한자로 올 경우를 대비한 백업
-        "甲": "甲", "己": "甲", "乙": "丙", "庚": "丙",
-        "丙": "戊", "辛": "戊", "丁": "庚", "壬": "庚",
-        "戊": "壬", "癸": "壬"
+        "무": "임", "계": "임"
     ]
 
     private let skyStems = ["갑", "을", "병", "정", "무", "기", "경", "신", "임", "계"]
@@ -1003,42 +994,31 @@ final class SajuManager {
         components.minute = timeComp.minute
 
         guard let combinedDate = calendar.date(from: components) else { return date }
-        // 서울 표준시 보정 (-30분)
         let seoulTimeDate = combinedDate.addingTimeInterval(-30 * 60)
 
         let adjustedHour = calendar.component(.hour, from: seoulTimeDate)
-        // 자시일 경우 다음날로 처리
         if adjustedHour >= 23 {
             return calendar.date(byAdding: .day, value: 1, to: seoulTimeDate) ?? seoulTimeDate
         }
         return seoulTimeDate
     }
 
-    func validateAndFix(apiItem: LunaItem, inputDate: Date) -> (month: String, hour: String) {
-        let correctedMonth = apiItem.lunWolgeon
-
-        // 1. 일간 추출 (한글 "병" 추출)
+    // 💡 월주 보정 로직을 제거하고 시주(hour)만 반환
+    func calculateSiJu(apiItem: LunaItem, inputDate: Date) -> String {
         let iljin = apiItem.lunIljin
         let ilgan = String(iljin.prefix(1))
 
-        // 2. 시두법 테이블 매핑 확인
-        guard let startGan = siduTable[ilgan] else {
-            return (correctedMonth, "알 수 없음")
-        }
+        guard let startGan = siduTable[ilgan] else { return "알 수 없음" }
 
         let calendar = Calendar.current
-        // inputDate는 이미 -30분 보정이 완료된 getAdjustedDate의 결과물이어야 함
         let hour = calendar.component(.hour, from: inputDate)
-
         let hourIdx = (hour + 1) / 2 % 12
         let branches = ["자", "축", "인", "묘", "진", "사", "오", "미", "신", "유", "술", "해"]
 
-        // 4. 천간 인덱스 순환 계산
         let startGanIdx = skyStems.firstIndex(of: startGan) ?? 0
         let currentGan = skyStems[(startGanIdx + hourIdx) % 10]
 
-        let finalHourSaju = "\(currentGan)\(branches[hourIdx])"
-        return (correctedMonth, finalHourSaju)
+        return "\(currentGan)\(branches[hourIdx])"
     }
 }
 
@@ -1195,7 +1175,6 @@ final class ProfileViewController: BaseViewController {
             }
         }
     }
-
     private func fetchSolar(date: Date, originalTime: Date) {
         let calendar = Calendar.current
         let year = calendar.component(.year, from: date)
@@ -1209,14 +1188,13 @@ final class ProfileViewController: BaseViewController {
             case .success(let answer):
                 let item = answer.response.body.items.item
 
-                // 💡 엣지케이스 보정 로직 가동
-                let fixedData = SajuManager.shared.validateAndFix(apiItem: item, inputDate: originalTime)
+                // 💡 시주만 계산
+                let fixedSiJu = SajuManager.shared.calculateSiJu(apiItem: item, inputDate: originalTime)
 
-                // 보정된 데이터 저장
+                // 💡 월주(sajuMonth) 저장 로직 삭제
                 UserDefaults.standard.set(item.lunSecha, forKey: UDKey.sajuYear)
-                UserDefaults.standard.set(fixedData.month, forKey: UDKey.sajuMonth) // 보정된 월주
                 UserDefaults.standard.set(item.lunIljin, forKey: UDKey.sajuDay)
-                UserDefaults.standard.set(fixedData.hour, forKey: UDKey.sajuHour)   // 시두법 적용 시주
+                UserDefaults.standard.set(fixedSiJu, forKey: UDKey.sajuHour)
 
                 NotificationCenter.default.post(name: NSNotification.Name("BirthDateChanged"), object: nil)
 
